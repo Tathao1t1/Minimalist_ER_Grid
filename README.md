@@ -269,7 +269,7 @@ strategies/minimalist_er_grid/
 ---
 
 ## Authors & Citation
-
-- **Developer**: Tathao (`thao.ta.240162@student.fulbright.edu.vn`)
-- **Institution**: Fulbright University Vietnam — Advanced Algorithmic Trading Lab
-- **Methodological Reference**: Perry J. Kaufman, *Trading Systems and Methods* (5th Edition), John Wiley & Sons.
+1. **Kaufman, P. J. (2013)**. *Trading Systems and Methods*, 5th ed. John Wiley & Sons.
+2. **Algotrade Education (2025)**. *Dynamic Grid Trading Algorithm - Project of Group 5 - CS408 - APCS, HCMUS*. GitHub: [algotrade-education/DynamicGrid](https://github.com/algotrade-education/DynamicGrid).
+3. **Hochreiter, R. & Wozabal, D. (2010)**. *Evolutionary grid trading for high-frequency algorithmic finance*. International Journal of Financial Engineering.
+4. **State Securities Commission of Vietnam (SSC)**. *Circular No. 120/2020/TT-BTC on Trading Regulations for Listed Securities*.
