@@ -8,3 +8,10 @@ trade_log.txt
 equity_series.csv
 optuna_trials.txt
 *.log
+
+# PLUTUS Verification Ephemera
+.plutus/run/
+.plutus/results/
+.plutus/cache/
+.plutus/build/
+.plutus/Dockerfile.generated

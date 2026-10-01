@@ -40,7 +40,8 @@ def run_optimization(config):
         return res.get(metric_target, -999.0)
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    study = optuna.create_study(direction="maximize")
+    sampler = optuna.samplers.TPESampler(seed=42)
+    study = optuna.create_study(direction="maximize", sampler=sampler)
     study.optimize(objective, n_trials=n_trials)
     
     print("\n" + "=" * 60)

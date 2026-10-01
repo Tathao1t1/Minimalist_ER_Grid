@@ -1,0 +1,184 @@
+schema_version: "2.0"
+
+repo:
+  name: minimalist_er_grid
+  primary_language: python
+
+env:
+  base: python
+  python_version: "3.12"
+  manager: pip
+  requirements_file: requirements.txt
+  gpu_required: false
+  install_project: false
+
+secrets: []
+
+data_sources:
+  processed: []
+  raw: []
+
+steps:
+  - id: data_preparation
+    nine_step: step_2_data_preparation
+    required: true
+    network: none
+    command: "python run_data_prep.py"
+    outputs:
+      - "data/data_summary.json"
+
+  - id: in_sample
+    nine_step: step_4_in_sample
+    required: true
+    network: none
+    command: "python run_is.py"
+    depends_on:
+      - data_preparation
+    outputs:
+      - "images/equity_curve_in_sample.png"
+
+  - id: optimization
+    nine_step: step_5_optimization
+    required: true
+    network: none
+    command: "python run_optimization.py"
+    depends_on:
+      - in_sample
+    outputs: []
+
+  - id: out_of_sample
+    nine_step: step_6_out_of_sample
+    required: true
+    network: none
+    command: "python run_oos.py"
+    depends_on:
+      - optimization
+    outputs:
+      - "images/equity_curve_out_sample.png"
+
+  - id: holdout_evaluation
+    nine_step: step_7_paper_trading
+    required: true
+    network: none
+    command: "python run_holdout.py"
+    depends_on:
+      - out_of_sample
+    outputs:
+      - "images/equity_curve_holdout.png"
+
+expected:
+  - step_id: data_preparation
+    metrics:
+      - name: in_sample_bars
+        value: 192886
+        tolerance: {kind: exact, value: 0}
+      - name: out_of_sample_bars
+        value: 67428
+        tolerance: {kind: exact, value: 0}
+      - name: holdout_bars
+        value: 46203
+        tolerance: {kind: exact, value: 0}
+    artifacts: []
+
+  - step_id: in_sample
+    metrics:
+      - name: total_return
+        value: -0.1959
+        tolerance: {kind: relative, value: 0.05}
+      - name: annual_return
+        value: -0.0712
+        tolerance: {kind: relative, value: 0.05}
+      - name: max_drawdown
+        value: 0.4456
+        tolerance: {kind: relative, value: 0.05}
+      - name: sharpe_ratio
+        value: 0.148
+        tolerance: {kind: absolute, value: 0.05}
+      - name: win_rate
+        value: 0.9255
+        tolerance: {kind: relative, value: 0.05}
+      - name: total_trades
+        value: 967
+        tolerance: {kind: exact, value: 0}
+      - name: tp_trades
+        value: 895
+        tolerance: {kind: exact, value: 0}
+    artifacts:
+      - path: images/equity_curve_in_sample.png
+        compare: visual_similarity
+        threshold: 0.70
+
+  - step_id: optimization
+    metrics:
+      - name: best_n_levels
+        value: 18
+        tolerance: {kind: exact, value: 0}
+      - name: best_grid_spacing_pct
+        value: 0.016
+        tolerance: {kind: relative, value: 0.10}
+    artifacts: []
+
+  - step_id: out_of_sample
+    metrics:
+      - name: total_return
+        value: 0.041
+        tolerance: {kind: relative, value: 0.05}
+      - name: annual_return
+        value: 0.0412
+        tolerance: {kind: relative, value: 0.05}
+      - name: max_drawdown
+        value: 0.0351
+        tolerance: {kind: relative, value: 0.05}
+      - name: sharpe_ratio
+        value: 0.69
+        tolerance: {kind: absolute, value: 0.05}
+      - name: win_rate
+        value: 1.0
+        tolerance: {kind: absolute, value: 0.01}
+      - name: total_trades
+        value: 252
+        tolerance: {kind: exact, value: 0}
+      - name: tp_trades
+        value: 252
+        tolerance: {kind: exact, value: 0}
+    artifacts:
+      - path: images/equity_curve_out_sample.png
+        compare: visual_similarity
+        threshold: 0.70
+
+  - step_id: holdout_evaluation
+    metrics:
+      - name: total_return
+        value: 0.0283
+        tolerance: {kind: relative, value: 0.05}
+      - name: annual_return
+        value: 0.0405
+        tolerance: {kind: relative, value: 0.05}
+      - name: max_drawdown
+        value: 0.07
+        tolerance: {kind: relative, value: 0.05}
+      - name: sharpe_ratio
+        value: 0.278
+        tolerance: {kind: absolute, value: 0.05}
+      - name: win_rate
+        value: 1.0
+        tolerance: {kind: absolute, value: 0.01}
+      - name: total_trades
+        value: 296
+        tolerance: {kind: exact, value: 0}
+      - name: tp_trades
+        value: 296
+        tolerance: {kind: exact, value: 0}
+    artifacts:
+      - path: images/equity_curve_holdout.png
+        compare: visual_similarity
+        threshold: 0.70
+
+nine_step_coverage:
+  step_1_hypothesis: {present: true, section: "1. Strategy Thesis & Core Hypothesis"}
+  step_2_data_preparation: {present: true, section: "2. Data Ingestion & Hygiene"}
+  step_3_forming_set_of_rules: {present: true, section: "3. Minimalist ER Spot Grid Architecture"}
+  step_4_in_sample: {present: true, section: "4. In-Sample Backtesting (2021–2023)"}
+  step_5_optimization: {present: true, section: "5. Parameter Stability & Bayesian Tuning"}
+  step_6_out_of_sample: {present: true, section: "6. Out-of-Sample Stress Testing (2024)"}
+  step_7_paper_trading: {present: true, section: "7. Final Blind Holdout Evaluation (2025)"}

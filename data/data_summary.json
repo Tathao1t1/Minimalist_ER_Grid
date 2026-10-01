@@ -1,0 +1,6 @@
+{
+  "in_sample_bars": 192886,
+  "out_of_sample_bars": 67428,
+  "holdout_bars": 46203,
+  "status": "verified"
+}

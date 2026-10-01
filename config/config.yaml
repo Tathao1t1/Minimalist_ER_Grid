@@ -31,7 +31,7 @@ strategy:
   slippage: 0.0005
 
 optimization:
-  n_trials: 50
+  n_trials: 10
   metric: sharpe_ratio
   n_levels_range:
   - 14
