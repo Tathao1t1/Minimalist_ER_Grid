@@ -1,9 +1,5 @@
 # Minimalist Kaufman ER Spot Grid Trading System
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Strategy Status](https://img.shields.io/badge/Strategy-Spot%20Grid%20Production-emerald.svg)]()
-[![Settlement](https://img.shields.io/badge/Market-HOSE%20T%2B2.5-amber.svg)]()
-[![Optimization](https://img.shields.io/badge/Optimization-Optuna%20Bayesian-purple.svg)]()
 
 A pure spot equity algorithmic trading framework designed for the Vietnamese stock market (HOSE). This strategy combines Perry Kaufman's non-parametric **Efficiency Ratio (ER)** stock selection with an **18-level geometric grid recycling engine**, capturing mean-reverting equity oscillations without derivative exposure, margin call risk, or directional leverage.
 
