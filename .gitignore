@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+results/
+trade_log.txt
+equity_series.csv
+optuna_trials.txt
+*.log
