@@ -17,7 +17,8 @@
         "capital_per_level": 13888888,
         "broker_fee_bps": 15,
         "sell_tax_bps": 10,
-        "slippage_bps": 5
+        "slippage_bps": 5,
+        "risk_free_rate": 0.06
     },
     "in_sample_performance": {
         "period": "2021-01 to 2024-01",
@@ -29,7 +30,7 @@
         "total_return": -0.1147,
         "cagr": -0.0404,
         "max_drawdown": -0.4061,
-        "sharpe_ratio": 0.186,
+        "sharpe_ratio": 0.071,
         "calmar_ratio": 0.100,
         "spot_harvest_pnl": 262036062,
         "spot_drag_pnl": -220277272,
@@ -45,7 +46,7 @@
         "total_return": 0.0890,
         "cagr": 0.0893,
         "max_drawdown": -0.0330,
-        "sharpe_ratio": 1.454,
+        "sharpe_ratio": 0.334,
         "calmar_ratio": 2.707,
         "spot_harvest_pnl": 95222353,
         "spot_drag_pnl": 0,
@@ -61,7 +62,7 @@
         "total_return": 0.0729,
         "cagr": 0.1055,
         "max_drawdown": -0.0688,
-        "sharpe_ratio": 0.548,
+        "sharpe_ratio": 0.254,
         "calmar_ratio": 1.533,
         "spot_harvest_pnl": 102077890,
         "spot_drag_pnl": 0,

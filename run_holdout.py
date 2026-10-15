@@ -34,7 +34,8 @@ def main():
         n_levels=strat_cfg.get("n_levels", 18),
         grid_spacing_pct=strat_cfg.get("grid_spacing_pct", 0.018),
         stop_buffer_levels=strat_cfg.get("stop_buffer_levels", 2),
-        trend_filter=strat_cfg.get("trend_filter", "none")
+        trend_filter=strat_cfg.get("trend_filter", "none"),
+        risk_free_rate=strat_cfg.get("risk_free_rate", 0.06)
     )
     
     res = sim.backtest(bundle)

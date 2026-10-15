@@ -92,7 +92,7 @@ expected:
         value: 0.4061
         tolerance: {kind: relative, value: 0.05}
       - name: sharpe_ratio
-        value: 0.186
+        value: 0.071
         tolerance: {kind: absolute, value: 0.05}
       - name: win_rate
         value: 0.9252
@@ -130,7 +130,7 @@ expected:
         value: 0.033
         tolerance: {kind: relative, value: 0.05}
       - name: sharpe_ratio
-        value: 1.454
+        value: 0.334
         tolerance: {kind: absolute, value: 0.05}
       - name: win_rate
         value: 1.0
@@ -158,7 +158,7 @@ expected:
         value: 0.0688
         tolerance: {kind: relative, value: 0.05}
       - name: sharpe_ratio
-        value: 0.548
+        value: 0.254
         tolerance: {kind: absolute, value: 0.05}
       - name: win_rate
         value: 1.0

@@ -16,8 +16,8 @@ A pure spot equity algorithmic trading framework designed for the Vietnamese sto
 - **Empirical Harvest & Performance**:
   - **+459,336,305 VND** in cumulative oscillation cash-flow harvests across 1,500 closed trades (2021–2026).
   - **100.0% Win Rate** across all 538 out-of-sample and forward holdout trades post-2023 (zero floor stops hit).
-  - **Out-of-Sample (2024)**: `+8.90% Net Return (+89,026,819 VND)`, `Sharpe: 1.454`, `Max Drawdown: -3.30%`.
-  - **Forward Holdout (2025–2026)**: `+7.29% Net Return (+72,862,928 VND)`, `Sharpe: 0.548`, `Max Drawdown: -6.88%`.
+  - **Out-of-Sample (2024)**: `+8.90% Net Return (+89,026,819 VND)`, `Sharpe (Rf=6%): 0.334`, `Max Drawdown: -3.30%`.
+  - **Forward Holdout (2025–2026)**: `+7.29% Net Return (+72,862,928 VND)`, `Sharpe (Rf=6%): 0.254`, `Max Drawdown: -6.88%`.
   - **Survives 2022 Secular Crash**: Risk-capping floor stops protect capital during the historic -35% VN30 market plunge, allowing the fund to preserve cash and harvest multi-year alpha.
 
 ---
@@ -64,10 +64,10 @@ plutus check .
 #### Chronological Pipeline Architecture
 The verification manifest ([`.plutus/manifest.yaml`](.plutus/manifest.yaml)) guarantees topological execution order and zero lookahead bias:
 1. **`step_2_data_preparation`**: Validates 30-minute bar datasets (192,886 IS bars, 67,428 OOS bars, 46,203 Holdout bars).
-2. **`step_4_in_sample`**: Evaluates 2021–2023 grid mechanics (`HPR: -11.47%`, `Sharpe: 0.186`, `Harvest: +262.0M VND`).
+2. **`step_4_in_sample`**: Evaluates 2021–2023 grid mechanics (`HPR: -11.47%`, `Sharpe: 0.071`, `Harvest: +262.0M VND`).
 3. **`step_5_optimization`**: Bayesian Optuna hyperparameter tuning locks optimal grid parameters (`n_levels = 18`, `spacing = 1.6%`).
-4. **`step_6_out_of_sample`**: Evaluates 2024 post-crash stress period (`HPR: +8.90%`, `Sharpe: 1.454`, 100% win rate).
-5. **`step_7_paper_trading`**: Evaluates 2025–2026 blind forward holdout (`HPR: +7.29%`, `Sharpe: 0.548`, 100% win rate).
+4. **`step_6_out_of_sample`**: Evaluates 2024 post-crash stress period (`HPR: +8.90%`, `Sharpe: 0.334`, 100% win rate).
+5. **`step_7_paper_trading`**: Evaluates 2025–2026 blind forward holdout (`HPR: +7.29%`, `Sharpe: 0.254`, 100% win rate).
 
 ---
 
@@ -108,20 +108,20 @@ To rigorously test whether Perry Kaufman's Efficiency Ratio (ER) and the SMA pro
 
 ### Comprehensive Ablation Performance Matrix
 
-| Evaluation Split | Selection Cohort | Total Return (HPR) | Sharpe Ratio | Max Drawdown | Win Rate | Floor Stops | Harvest PnL (VND) | Drag PnL (VND) |
+| Evaluation Split | Selection Cohort | Total Return (HPR) | Sharpe Ratio (Rf=6%) | Max Drawdown | Win Rate | Floor Stops | Harvest PnL (VND) | Drag PnL (VND) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **In-Sample**<br>*(2021–2023 Crash)* | **Low ER (Proposed Strategy)** | **-11.47%** | **0.186** | **-40.61%** | **92.5%** | **72** | **+262,036,062** | **-220,277,272** |
+| **In-Sample**<br>*(2021–2023 Crash)* | **Low ER (Proposed Strategy)** | **-11.47%** | **0.071** | **-40.61%** | **92.5%** | **72** | **+262,036,062** | **-220,277,272** |
 | | High ER (Counter-Hypothesis) | -33.91% | -0.197 | -58.82% | 88.0% | 148 | +297,772,130 | -486,131,348 |
 | | Random Selection (Baseline) | -33.41% | -0.224 | -53.94% | 86.8% | 161 | +306,477,882 | -495,213,293 |
-| | Low ER without SMA Filter | -13.14% | 0.171 | -42.85% | 92.4% | 85 | +284,524,635 | -261,387,015 |
-| **Out-of-Sample**<br>*(2024 Recovery)* | **Low ER (Proposed Strategy)** | **+8.90%** | **1.454** | **-3.30%** | **100.0%** | **0** | **+95,222,353** | **0** |
-| | High ER (Counter-Hypothesis) | +4.94% | 0.778 | -6.65% | 100.0% | 0 | +64,570,891 | 0 |
-| | Random Selection (Baseline) | +6.95% | 1.155 | -4.43% | 100.0% | 0 | +78,924,964 | 0 |
-| | Low ER without SMA Filter | +7.20% | 1.153 | -5.84% | 100.0% | 0 | +84,888,318 | 0 |
-| **Forward Holdout**<br>*(2025–2026 Blind)* | **Low ER (Proposed Strategy)** | **+7.29%** | **0.548** | **-6.88%** | **100.0%** | **0** | **+102,077,890** | **0** |
+| | Low ER without SMA Filter | -13.14% | 0.095 | -42.85% | 92.4% | 85 | +284,524,635 | -261,387,015 |
+| **Out-of-Sample**<br>*(2024 Recovery)* | **Low ER (Proposed Strategy)** | **+8.90%** | **0.334** | **-3.30%** | **100.0%** | **0** | **+95,222,353** | **0** |
+| | High ER (Counter-Hypothesis) | +4.94% | 0.284 | -6.65% | 100.0% | 0 | +64,570,891 | 0 |
+| | Random Selection (Baseline) | +6.95% | 0.018 | -4.43% | 100.0% | 0 | +78,924,964 | 0 |
+| | Low ER without SMA Filter | +7.20% | 0.363 | -5.84% | 100.0% | 0 | +84,888,318 | 0 |
+| **Forward Holdout**<br>*(2025–2026 Blind)* | **Low ER (Proposed Strategy)** | **+7.29%** | **0.254** | **-6.88%** | **100.0%** | **0** | **+102,077,890** | **0** |
 | | High ER (Counter-Hypothesis) | -29.73% | -0.669 | -34.81% | 86.2% | 54 | +107,381,643 | -313,289,286 |
 | | Random Selection (Baseline) | -11.96% | -0.320 | -21.86% | 93.6% | 23 | +106,758,266 | -148,848,705 |
-| | Low ER without SMA Filter | -11.29% | -0.228 | -20.67% | 95.8% | 17 | +128,495,662 | -156,069,380 |
+| | Low ER without SMA Filter | -11.29% | -0.238 | -20.67% | 95.8% | 17 | +128,495,662 | -156,069,380 |
 
 ### Key Takeaways from Empirical Validation:
 1. **Low ER Outperforms Counter-Hypothesis Dramatically**: High ER assets (trending stocks) suffer catastrophic failures during market downturns. In the Forward Holdout period, High ER lost **-29.73%** with 54 floor stops, while Low ER gained **+7.29%** with 0 stops. This validates our core hypothesis: *grid trading requires mean-reverting, range-bound assets; deploying a grid on trending assets generates lethal one-way inventory accumulation.*
@@ -160,11 +160,11 @@ Reviewers frequently ask whether high-frequency tick data should be used instead
 
 The strategy was evaluated across three distinct macroeconomic phases on 30-minute bar data with zero forward leakage:
 
-| Evaluation Phase | Time Period | Macroeconomic Context | Closed Trades | Take-Profit Trades | Floor Stops | Win Rate | Spot Harvest PnL | Spot Drag PnL | Net Total Profit | Net Return (1.0B Capital) | Max Drawdown | Sharpe Ratio | Calmar Ratio |
+| Evaluation Phase | Time Period | Macroeconomic Context | Closed Trades | Take-Profit Trades | Floor Stops | Win Rate | Spot Harvest PnL | Spot Drag PnL | Net Total Profit | Net Return (1.0B Capital) | Max Drawdown | Sharpe Ratio (Rf=6%) | Calmar Ratio |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **In-Sample (IS)** | 2021–2023 | Historic Bull + 2022 Crash (-35%) | 962 | 890 | 72 | **92.5%** | **+262,036,062 VND** | **-220,277,272 VND** | **-114,682,730 VND** | **-11.47%** | **-40.61%** | **0.186** | **0.100** |
-| **Out-of-Sample (OOS)** | 2024 | Range-Bound / Recovery | 250 | 250 | 0 | **100.0%** | **+95,222,353 VND** | **0 VND** | **+89,026,819 VND** | **+8.90%** | **-3.30%** | **1.454** | **2.707** |
-| **Forward Holdout** | 2025–2026 | Choppy Downward Surges (-3.44% VN30) | 288 | 288 | 0 | **100.0%** | **+102,077,890 VND** | **0 VND** | **+72,862,928 VND** | **+7.29%** | **-6.88%** | **0.548** | **1.533** |
+| **In-Sample (IS)** | 2021–2023 | Historic Bull + 2022 Crash (-35%) | 962 | 890 | 72 | **92.5%** | **+262,036,062 VND** | **-220,277,272 VND** | **-114,682,730 VND** | **-11.47%** | **-40.61%** | **0.071** | **0.100** |
+| **Out-of-Sample (OOS)** | 2024 | Range-Bound / Recovery | 250 | 250 | 0 | **100.0%** | **+95,222,353 VND** | **0 VND** | **+89,026,819 VND** | **+8.90%** | **-3.30%** | **0.334** | **2.707** |
+| **Forward Holdout** | 2025–2026 | Choppy Downward Surges (-3.44% VN30) | 288 | 288 | 0 | **100.0%** | **+102,077,890 VND** | **0 VND** | **+72,862,928 VND** | **+7.29%** | **-6.88%** | **0.254** | **1.533** |
 | **Cumulative Total** | **2021–2026** | **Full Multi-Year Macro Cycle** | **1,500** | **1,428** | **72** | **95.2%** | **+459,336,305 VND** | **-220,277,272 VND** | **+47,207,017 VND** | **+4.72%** | **-40.61%** | **—** | **—** |
 
 ---
@@ -204,7 +204,7 @@ python src/driver.py --mode optimize
 python run_oos.py
 ```
 - **100% Win Rate**: 250 closed trades, 0 floor stops.
-- Generated **+89,026,819 VND (+8.90%)** net return with a tiny **-3.30% maximum drawdown** and **Sharpe of 1.454**.
+- Generated **+89,026,819 VND (+8.90%)** net return with a tiny **-3.30% maximum drawdown** and **Sharpe (Rf=6%) of 0.334**.
 
 ![Out-of-Sample Equity Curve](images/equity_curve_out_sample.png)
 
@@ -213,7 +213,7 @@ python run_oos.py
 python run_holdout.py
 ```
 - **100% Win Rate**: 288 closed trades, 0 floor stops.
-- Generated **+72,862,928 VND (+7.29%)** net profit, delivering strong uncorrelated alpha while the broader market chopped downward.
+- Generated **+72,862,928 VND (+7.29%)** net profit with **Sharpe (Rf=6%) of 0.254**, delivering strong uncorrelated alpha while the broader market chopped downward.
 
 ![Forward Holdout Equity Curve](images/equity_curve_holdout.png)
 

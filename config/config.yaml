@@ -29,6 +29,7 @@ strategy:
   broker_fee: 0.0015
   sell_tax: 0.0010
   slippage: 0.0005
+  risk_free_rate: 0.06
 
 optimization:
   n_trials: 10

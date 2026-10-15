@@ -34,7 +34,8 @@ def run_optimization(config):
             n_levels=n_levels,
             grid_spacing_pct=grid_spacing_pct,
             stop_buffer_levels=strat_cfg.get("stop_buffer_levels", 2),
-            trend_filter=strat_cfg.get("trend_filter", "none")
+            trend_filter=strat_cfg.get("trend_filter", "none"),
+            risk_free_rate=strat_cfg.get("risk_free_rate", 0.06)
         )
         res = sim.backtest(data_bundle)
         return res.get(metric_target, -999.0)

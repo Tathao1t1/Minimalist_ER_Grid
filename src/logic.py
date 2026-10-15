@@ -121,6 +121,7 @@ class MinimalistERGridBacktest:
         selection_mode="er_low",
         seed=42,
         use_sma_filter=True,
+        risk_free_rate=0.06,
         **kwargs
     ):
         self.capital = float(capital)
@@ -138,6 +139,7 @@ class MinimalistERGridBacktest:
         self.selection_mode = str(selection_mode)
         self.seed = int(seed)
         self.use_sma_filter = bool(use_sma_filter)
+        self.risk_free_rate = float(risk_free_rate)
         
         self.trades_df = pd.DataFrame()
         self.equity_series = pd.Series(dtype=float)
@@ -374,9 +376,11 @@ class MinimalistERGridBacktest:
             longest_dd_days = int(round(max_days))
             
         rets = eq_series.pct_change().dropna()
-        sharpe = float(rets.mean() / rets.std() * np.sqrt(2016)) if rets.std() > 0 else 0.0
-        downside_rets = rets[rets < 0]
-        sortino = float(rets.mean() / downside_rets.std() * np.sqrt(2016)) if len(downside_rets) > 0 and downside_rets.std() > 0 else 0.0
+        rf_per_bar = self.risk_free_rate / 2016.0
+        excess_mean = float(rets.mean() - rf_per_bar)
+        sharpe = float(excess_mean / rets.std() * np.sqrt(2016)) if rets.std() > 0 else 0.0
+        downside_rets = rets[rets < rf_per_bar] - rf_per_bar
+        sortino = float(excess_mean / downside_rets.std() * np.sqrt(2016)) if len(downside_rets) > 0 and downside_rets.std() > 0 else 0.0
         calmar = abs(cagr / max_dd) if max_dd != 0 else 0.0
         
         tp_trades = self.trades_df[self.trades_df["reason"] == "target"] if len(self.trades_df) > 0 else pd.DataFrame()
