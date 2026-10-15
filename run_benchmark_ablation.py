@@ -86,8 +86,8 @@ def main():
         print(f"{row['split']:<12} | {row['cohort']:<32} | {row['hpr']:+6.2f}%  | {row['sharpe']:6.3f} | {row['max_dd']:6.2f}% | {row['win_rate']:6.1f}% | {row['drag_trades']}")
     print("=" * 95)
     
-    # Generate Multi-Panel Comparison Visualization
-    fig, axes = plt.subplots(1, 3, figsize=(20, 6), sharey=False)
+    # Generate Multi-Panel Comparison Visualization with Exact Metric Callouts
+    fig, axes = plt.subplots(1, 3, figsize=(21, 6.5), sharey=False)
     colors = {
         "Low ER (Proposed Strategy)": "#059669",      # Emerald Green
         "High ER (Counter-Hypothesis)": "#DC2626",    # Crimson Red
@@ -113,15 +113,15 @@ def main():
         for _, row in split_rows.iterrows():
             c_name = row["cohort"]
             eq = (row["equity_series"] / 1_000_000_000.0) * 100.0  # Normalized to 100 base
-            ax.plot(eq.index, eq.values, label=c_name, color=colors[c_name], linestyle=styles[c_name], linewidth=1.8)
+            label_text = f"{c_name}: {row['hpr']:+.2f}% (DD {row['max_dd']:.1f}%)"
+            ax.plot(eq.index, eq.values, label=label_text, color=colors[c_name], linestyle=styles[c_name], linewidth=1.8)
             
         ax.set_title(split_titles[split], fontsize=13, fontweight="bold", pad=10)
         ax.axhline(100.0, color="#9CA3AF", linestyle="--", alpha=0.6, linewidth=1)
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax.grid(True, linestyle=":", alpha=0.5)
         ax.set_ylabel("Portfolio Equity (Normalized Base = 100)", fontsize=10)
-        if idx == 0:
-            ax.legend(loc="lower left", fontsize=9, framealpha=0.9)
+        ax.legend(loc="best", fontsize=8.5, framealpha=0.92)
             
     plt.suptitle("Kaufman Efficiency Ratio (ER) & SMA Proximity Ablation Study", fontsize=15, fontweight="bold", y=1.02)
     plt.tight_layout()
@@ -131,6 +131,24 @@ def main():
     plt.savefig(out_img, dpi=300, bbox_inches="tight")
     plt.close()
     print(f"\nSaved comparison chart to: {out_img}")
+
+    print("\n" + "=" * 100)
+    print("EXACT MARKDOWN TABLE FOR README:")
+    print("=" * 100)
+    print("| Evaluation Split | Selection Cohort | Total Return (HPR) | Sharpe Ratio (Rf=6%) | Max Drawdown | Win Rate | Floor Stops | Spot Harvest PnL | Spot Drag PnL |")
+    print("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+    for split in splits:
+        split_name = {
+            "in_sample": "**In-Sample**<br>*(2021–2023 Crash)*",
+            "out_sample": "**Out-of-Sample**<br>*(2024 Recovery)*",
+            "holdout": "**Forward Holdout**<br>*(2025–2026 Blind)*"
+        }[split]
+        s_rows = summary_df[summary_df["split"] == split]
+        for row_idx, (_, r) in enumerate(s_rows.iterrows()):
+            sp = split_name if row_idx == 0 else ""
+            bold = "**" if "Proposed" in r["cohort"] else ""
+            print(f"| {sp} | {bold}{r['cohort']}{bold} | {bold}{r['hpr']:+.2f}%{bold} | {bold}{r['sharpe']:.3f}{bold} | {bold}{r['max_dd']:.2f}%{bold} | {bold}{r['win_rate']:.1f}%{bold} | {bold}{r['drag_trades']}{bold} | {bold}{r['harvest_pnl']:+,.0f} VND{bold} | {bold}{r['drag_pnl']:+,.0f} VND{bold} |")
+    print("=" * 100)
 
 if __name__ == "__main__":
     main()
