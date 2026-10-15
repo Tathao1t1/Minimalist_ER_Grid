@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 
 def kaufman_er(prices: np.ndarray) -> float:
     """
@@ -30,10 +31,22 @@ def get_settlement_dt(trade_dt: datetime) -> datetime:
             added += 1
     return datetime.combine(d, datetime.strptime("13:00", "%H:%M").time())
 
-def build_zero_overlap_whitelist(bars_df, lookback_days=40, rebalance_days=10, top_k=4, trend_filter="none"):
+def build_zero_overlap_whitelist(
+    bars_df,
+    lookback_days=40,
+    rebalance_days=10,
+    top_k=4,
+    trend_filter="none",
+    selection_mode="er_low",
+    seed=42
+):
     """
     Point-in-Time constituent selection based on Kaufman Efficiency Ratio (ER).
     Evaluates rolling historical window [t - lookback_days, t] with zero forward leakage.
+    Supports selection_mode:
+      - 'er_low': Top-K lowest ER (mean-reverting, oscillating - core strategy)
+      - 'er_high': Top-K highest ER (trending, momentum - counter-hypothesis)
+      - 'random': Top-K randomly sampled constituents (benchmark control group)
     """
     daily_records = []
     for ticker, df in bars_df.groupby("tickersymbol"):
@@ -52,6 +65,7 @@ def build_zero_overlap_whitelist(bars_df, lookback_days=40, rebalance_days=10, t
     all_dates = sorted(daily_df["date"].unique())
     piv_close = daily_df.pivot(index="date", columns="tickersymbol", values="close").ffill()
     
+    rng = np.random.RandomState(seed)
     whitelist = {}
     for i in range(lookback_days, len(all_dates), rebalance_days):
         rebal_date = all_dates[i]
@@ -64,9 +78,24 @@ def build_zero_overlap_whitelist(bars_df, lookback_days=40, rebalance_days=10, t
             er_val = kaufman_er(c_hist.values)
             candidates.append((ticker, er_val))
             
-        # Select lowest ER (most mean-reverting oscillating stocks)
-        candidates.sort(key=lambda x: x[1])
-        whitelist[rebal_date] = [c[0] for c in candidates[:top_k]]
+        if selection_mode == "er_low":
+            # Select lowest ER (most mean-reverting oscillating stocks)
+            candidates.sort(key=lambda x: x[1])
+            whitelist[rebal_date] = [c[0] for c in candidates[:top_k]]
+        elif selection_mode == "er_high":
+            # Select highest ER (trending stocks)
+            candidates.sort(key=lambda x: x[1], reverse=True)
+            whitelist[rebal_date] = [c[0] for c in candidates[:top_k]]
+        elif selection_mode == "random":
+            valid_tickers = [c[0] for c in candidates]
+            if len(valid_tickers) >= top_k:
+                chosen = rng.choice(valid_tickers, size=top_k, replace=False).tolist()
+            else:
+                chosen = valid_tickers
+            whitelist[rebal_date] = chosen
+        else:
+            candidates.sort(key=lambda x: x[1])
+            whitelist[rebal_date] = [c[0] for c in candidates[:top_k]]
         
     return whitelist
 
@@ -89,6 +118,9 @@ class MinimalistERGridBacktest:
         grid_spacing_pct=0.018,
         stop_buffer_levels=2,
         trend_filter="none",
+        selection_mode="er_low",
+        seed=42,
+        use_sma_filter=True,
         **kwargs
     ):
         self.capital = float(capital)
@@ -103,6 +135,9 @@ class MinimalistERGridBacktest:
         self.grid_spacing_pct = float(grid_spacing_pct)
         self.stop_buffer_levels = int(stop_buffer_levels)
         self.trend_filter = str(trend_filter)
+        self.selection_mode = str(selection_mode)
+        self.seed = int(seed)
+        self.use_sma_filter = bool(use_sma_filter)
         
         self.trades_df = pd.DataFrame()
         self.equity_series = pd.Series(dtype=float)
@@ -121,7 +156,9 @@ class MinimalistERGridBacktest:
             lookback_days=self.selection_lookback,
             rebalance_days=self.selection_rebalance_days,
             top_k=self.top_k,
-            trend_filter=self.trend_filter
+            trend_filter=self.trend_filter,
+            selection_mode=self.selection_mode,
+            seed=self.seed
         )
         
         # 2. Compute 50-period SMA anchor per ticker
@@ -156,22 +193,41 @@ class MinimalistERGridBacktest:
                 if ticker not in bar_group.index:
                     continue
                 bar = bar_group.loc[ticker]
-                bar_h, bar_l, bar_c = float(bar["high"]), float(bar["low"]), float(bar["close"])
+                bar_o, bar_h, bar_l, bar_c = float(bar["open"]), float(bar["high"]), float(bar["low"]), float(bar["close"])
                 grid_info = grids.get(ticker)
                 floor_stop = grid_info["stop"] if grid_info else 0.0
                 is_floor_hit = (bar_l <= floor_stop) and (floor_stop > 0)
                 
                 to_remove = []
                 lvl_dict = positions[ticker]
-                for lvl, pos in lvl_dict.items():
+                for lvl, pos in list(lvl_dict.items()):
                     can_exit = (ts >= pos["settlement"])
-                    if is_floor_hit:
-                        fill = max(min(float(bar["open"]), floor_stop), floor_stop * 0.93)
-                        to_remove.append((lvl, fill, True, "floor_stop"))
+                    
+                    # 1. Position previously hit stop and was awaiting settlement (HOSE T+2.5)
+                    if pos.get("pending_floor_stop", False):
+                        if can_exit:
+                            fill = bar_o  # Sells immediately at Open of settlement bar
+                            to_remove.append((lvl, fill, True, "settled_floor_stop"))
                         continue
+
+                    # 2. Floor stop hit during current bar
+                    if is_floor_hit:
+                        if can_exit:
+                            fill = max(min(bar_o, floor_stop), floor_stop * 0.93)
+                            to_remove.append((lvl, fill, True, "floor_stop"))
+                        else:
+                            # Cannot exit before settlement on HOSE! Mark pending
+                            pos["pending_floor_stop"] = True
+                            if ticker in grids:
+                                grids[ticker]["stop_triggered"] = True
+                        continue
+
+                    # 3. Take-Profit Exit (requires settlement)
                     if bar_h >= pos["tp_price"] and can_exit:
                         to_remove.append((lvl, pos["tp_price"], False, "target"))
                         continue
+
+                    # 4. Rotation Exit (requires settlement)
                     if ticker not in cur_wl and can_exit and (grid_info is None):
                         to_remove.append((lvl, bar_c, True, "rotation_exit"))
                         continue
@@ -198,13 +254,9 @@ class MinimalistERGridBacktest:
                         "holding_days": (ts - pos["entry_ts"]).total_seconds() / 86400.0
                     })
                     
-                if is_floor_hit:
+                if len(lvl_dict) == 0:
                     positions.pop(ticker, None)
-                    if ticker in grids:
-                        del grids[ticker]
-                elif len(lvl_dict) == 0 and ticker not in cur_wl:
-                    positions.pop(ticker, None)
-                    if ticker in grids:
+                    if ticker in grids and (grids[ticker].get("stop_triggered", False) or ticker not in cur_wl):
                         del grids[ticker]
 
             # PASS 2: GRID INITIALIZATION
@@ -219,22 +271,38 @@ class MinimalistERGridBacktest:
                         continue
                     bar = bar_group.loc[ticker]
                     sma_val = anchors[ticker].get(ts, np.nan)
-                    if np.isnan(sma_val) or abs(float(bar["close"]) - sma_val) / sma_val > 0.03:
+                    if np.isnan(sma_val):
+                        continue
+                    if self.use_sma_filter and (abs(float(bar["close"]) - sma_val) / sma_val > 0.03):
                         continue
                     spacing = sma_val * self.grid_spacing_pct
                     levels = [round(sma_val - k * spacing, 2) for k in range(1, self.n_levels + 1)]
                     tps = [round(sma_val - (k - 1) * spacing, 2) for k in range(1, self.n_levels + 1)]
                     stop_px = sma_val - (self.n_levels + self.stop_buffer_levels) * spacing
-                    grids[ticker] = {"anchor": sma_val, "levels": levels, "tps": tps, "stop": stop_px}
+                    grids[ticker] = {
+                        "anchor": sma_val,
+                        "levels": levels,
+                        "tps": tps,
+                        "stop": stop_px,
+                        "active_from_ts": ts  # Limit orders active only starting from next bar t+1
+                    }
                     positions.setdefault(ticker, {})
                     avail_slots -= 1
                     if avail_slots <= 0:
                         break
 
             # PASS 3: BUY LIMIT FILL EVALUATION
-            for ticker, g in grids.items():
+            for ticker, g in list(grids.items()):
                 if ticker not in bar_group.index:
                     continue
+                # Block new buys if floor stop was triggered
+                if g.get("stop_triggered", False):
+                    continue
+                # Order placement lag: Newly deployed grid at close of ts only active from bar t+1
+                if g.get("active_from_ts") == ts:
+                    continue
+                    
+                bar_o = float(bar_group.loc[ticker, "open"])
                 bar_l = float(bar_group.loc[ticker, "low"])
                 lvl_dict = positions.setdefault(ticker, {})
                 for lvl_idx in range(1, self.n_levels + 1):
@@ -243,7 +311,11 @@ class MinimalistERGridBacktest:
                     buy_px = g["levels"][lvl_idx - 1]
                     if bar_l > buy_px:
                         continue
-                    actual_fill = buy_px * (1.0 + self.slippage)
+                        
+                    # Pessimistic Gap Fill: if bar opened below buy limit, fill at Open
+                    fill_base = bar_o if bar_o <= buy_px else buy_px
+                    actual_fill = fill_base * (1.0 + self.slippage)
+                    
                     order_shares = max(100, int(round(capital_per_level / actual_fill / 100.0)) * 100)
                     entry_cost = actual_fill * order_shares * self.broker_fee
                     total_cost = actual_fill * order_shares + entry_cost
@@ -256,7 +328,8 @@ class MinimalistERGridBacktest:
                         "tp_price": g["tps"][lvl_idx - 1],
                         "entry_cost": entry_cost,
                         "entry_ts": ts,
-                        "settlement": get_settlement_dt(ts)
+                        "settlement": get_settlement_dt(ts),
+                        "pending_floor_stop": False
                     }
                     
             pos_val = sum(
@@ -332,3 +405,34 @@ class MinimalistERGridBacktest:
             "spot_drag_pnl": drag_pnl,
             "equity_series": eq_series
         }
+
+def plot_equity_curve(eq_series: pd.Series, initial_capital: float, title: str, output_path: str):
+    """
+    Plots a dual-panel equity curve and drawdown chart, saved cleanly to output_path.
+    """
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 7.5), gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
+    
+    # Panel 1: Portfolio Value
+    ax1.plot(eq_series.index, eq_series.values / 1e9, label='Portfolio Equity (Billion VND)', color='#0284c7', lw=1.8)
+    ax1.axhline(initial_capital / 1e9, color='#64748b', linestyle='--', label=f'Initial Capital ({initial_capital/1e9:.1f}B VND)')
+    ax1.set_title(title, fontsize=13, fontweight='bold', pad=12)
+    ax1.set_ylabel("Portfolio Value (Billion VND)", fontsize=11)
+    ax1.grid(True, linestyle=':', alpha=0.6)
+    ax1.legend(loc='upper left')
+    
+    # Panel 2: Drawdown
+    peak = eq_series.cummax()
+    dd = (eq_series - peak) / peak * 100.0
+    ax2.fill_between(dd.index, dd.values, 0, color='#ef4444', alpha=0.35)
+    ax2.plot(dd.index, dd.values, color='#dc2626', lw=1.2, label='Drawdown (%)')
+    ax2.set_ylabel("Drawdown (%)", fontsize=11)
+    ax2.set_xlabel("Date", fontsize=11)
+    ax2.grid(True, linestyle=':', alpha=0.6)
+    ax2.legend(loc='lower left')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Equity curve chart saved to: {output_path}")
+

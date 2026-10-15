@@ -83,25 +83,25 @@ expected:
   - step_id: in_sample
     metrics:
       - name: total_return
-        value: -0.1959
+        value: -0.1147
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: -0.0712
+        value: -0.0404
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.4456
+        value: 0.4061
         tolerance: {kind: relative, value: 0.05}
       - name: sharpe_ratio
-        value: 0.148
+        value: 0.186
         tolerance: {kind: absolute, value: 0.05}
       - name: win_rate
-        value: 0.9255
+        value: 0.9252
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
-        value: 967
+        value: 962
         tolerance: {kind: exact, value: 0}
       - name: tp_trades
-        value: 895
+        value: 890
         tolerance: {kind: exact, value: 0}
     artifacts:
       - path: images/equity_curve_in_sample.png
@@ -121,25 +121,25 @@ expected:
   - step_id: out_of_sample
     metrics:
       - name: total_return
-        value: 0.041
+        value: 0.089
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: 0.0412
+        value: 0.0893
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.0351
+        value: 0.033
         tolerance: {kind: relative, value: 0.05}
       - name: sharpe_ratio
-        value: 0.69
+        value: 1.454
         tolerance: {kind: absolute, value: 0.05}
       - name: win_rate
         value: 1.0
         tolerance: {kind: absolute, value: 0.01}
       - name: total_trades
-        value: 252
+        value: 250
         tolerance: {kind: exact, value: 0}
       - name: tp_trades
-        value: 252
+        value: 250
         tolerance: {kind: exact, value: 0}
     artifacts:
       - path: images/equity_curve_out_sample.png
@@ -149,25 +149,25 @@ expected:
   - step_id: holdout_evaluation
     metrics:
       - name: total_return
-        value: 0.0283
+        value: 0.0729
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: 0.0405
+        value: 0.1055
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.07
+        value: 0.0688
         tolerance: {kind: relative, value: 0.05}
       - name: sharpe_ratio
-        value: 0.278
+        value: 0.548
         tolerance: {kind: absolute, value: 0.05}
       - name: win_rate
         value: 1.0
         tolerance: {kind: absolute, value: 0.01}
       - name: total_trades
-        value: 296
+        value: 288
         tolerance: {kind: exact, value: 0}
       - name: tp_trades
-        value: 296
+        value: 288
         tolerance: {kind: exact, value: 0}
     artifacts:
       - path: images/equity_curve_holdout.png

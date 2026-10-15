@@ -8,7 +8,7 @@ if curr_dir not in sys.path:
 
 import plutus_verify as pv
 from src.data_fetcher import prepare_data
-from src.logic import MinimalistERGridBacktest
+from src.logic import MinimalistERGridBacktest, plot_equity_curve
 
 def main():
     print("=" * 70)
@@ -57,6 +57,12 @@ def main():
         r.metric("total_trades", int(res["total_trades"]), unit="count")
         r.metric("tp_trades", int(res["tp_trades"]), unit="count")
         chart_path = "images/equity_curve_holdout.png"
+        plot_equity_curve(
+            res["equity_series"],
+            strat_cfg.get("capital", 1_000_000_000),
+            "Minimalist ER Spot Grid — Equity Curve [HOLDOUT EVALUATION]",
+            os.path.join(curr_dir, chart_path)
+        )
         if os.path.exists(os.path.join(curr_dir, chart_path)):
             r.artifact("equity_curve", chart_path, kind="chart")
 
