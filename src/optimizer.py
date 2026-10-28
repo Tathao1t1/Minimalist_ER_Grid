@@ -21,9 +21,9 @@ def run_optimization(config):
     if metric_target in ("sharpe_ratio", "sharpe"):
         metric_target = "daily_sharpe"
         
-    # Search space with proven interior optimum (strictly not pinned at boundaries)
+    # Search space strictly constrained from 0.5% to 2.0% max (including initial baseline 1.8%)
     n_levels_list = [12, 14, 16, 18, 20]
-    spacing_list = [0.020, 0.025, 0.030, 0.035, 0.040]
+    spacing_list = [0.005, 0.010, 0.014, 0.018, 0.020]
     
     # In-Sample optimal timing parameters
     opt_lookback = 30

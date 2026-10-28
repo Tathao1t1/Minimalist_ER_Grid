@@ -39,11 +39,11 @@ optimization:
   method: "exhaustive_grid"
   metric: calmar_ratio
   n_levels_range:
-  - 14
-  - 22
+  - 12
+  - 20
   grid_spacing_pct_range:
-  - 0.014
-  - 0.022
+  - 0.005
+  - 0.020
 
 results:
   base_directory: results

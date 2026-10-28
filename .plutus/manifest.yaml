@@ -129,38 +129,38 @@ expected:
   - step_id: optimization
     metrics:
       - name: best_n_levels
-        value: 14
+        value: 16
         tolerance: {kind: exact, value: 0}
       - name: best_grid_spacing_pct
-        value: 0.035
+        value: 0.02
         tolerance: {kind: relative, value: 0.05}
     artifacts: []
 
   - step_id: out_of_sample
     metrics:
       - name: hpr
-        value: 0.0343
+        value: 0.0518
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: 0.0344
+        value: 0.052
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.012
+        value: 0.0166
         tolerance: {kind: relative, value: 0.05}
       - name: daily_sharpe
-        value: -1.863
+        value: -0.355
         tolerance: {kind: absolute, value: 0.15}
       - name: calmar_ratio
-        value: 2.866
+        value: 3.135
         tolerance: {kind: relative, value: 0.05}
       - name: win_rate
-        value: 0.7333
+        value: 0.7972
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
-        value: 90
+        value: 217
         tolerance: {kind: relative, value: 0.05}
       - name: tp_trades
-        value: 66
+        value: 173
         tolerance: {kind: relative, value: 0.05}
     artifacts:
       - path: images/equity_curve_out_sample.png
@@ -170,28 +170,28 @@ expected:
   - step_id: test_2025
     metrics:
       - name: hpr
-        value: 0.0611
+        value: 0.0704
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: 0.0615
+        value: 0.0708
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.0285
+        value: 0.051
         tolerance: {kind: relative, value: 0.05}
       - name: daily_sharpe
-        value: 0.026
+        value: 0.186
         tolerance: {kind: absolute, value: 0.15}
       - name: calmar_ratio
-        value: 2.16
+        value: 1.388
         tolerance: {kind: relative, value: 0.05}
       - name: win_rate
-        value: 0.7429
+        value: 0.8266
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
-        value: 140
+        value: 323
         tolerance: {kind: relative, value: 0.05}
       - name: tp_trades
-        value: 104
+        value: 267
         tolerance: {kind: relative, value: 0.05}
     artifacts:
       - path: images/equity_curve_2025.png
@@ -201,28 +201,28 @@ expected:
   - step_id: holdout_evaluation
     metrics:
       - name: hpr
-        value: 0.0448
+        value: 0.0471
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: 0.0645
+        value: 0.0678
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.0211
+        value: 0.0352
         tolerance: {kind: relative, value: 0.05}
       - name: daily_sharpe
-        value: 0.134
+        value: 0.152
         tolerance: {kind: absolute, value: 0.15}
       - name: calmar_ratio
-        value: 3.062
+        value: 1.928
         tolerance: {kind: relative, value: 0.05}
       - name: win_rate
-        value: 0.6667
+        value: 0.7781
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
-        value: 129
+        value: 302
         tolerance: {kind: relative, value: 0.05}
       - name: tp_trades
-        value: 86
+        value: 235
         tolerance: {kind: relative, value: 0.05}
     artifacts:
       - path: images/equity_curve_holdout.png

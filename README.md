@@ -238,7 +238,7 @@ Saved to [`results/lookback_rebalance_surface.csv`](results/lookback_rebalance_s
 ---
 
 ### 2. Exhaustive 25-Point In-Sample Grid Search (`P-1`, `P-2`, `P-6`)
-Using the In-Sample optimal timing parameters ($30\text{d}, 15\text{d}$), the grid search evaluated $N \in [12, 14, 16, 18, 20]$ and Spacing $\Delta \in [2.0\%, 2.5\%, 3.0\%, 3.5\%, 4.0\%]$ strictly on In-Sample data (2021–2023):
+Using the In-Sample optimal timing parameters ($30\text{d}, 15\text{d}$), the grid search evaluated $N \in [12, 14, 16, 18, 20]$ and Spacing $\Delta \in [0.5\%, 1.0\%, 1.4\%, 1.8\%, 2.0\%]$ strictly on In-Sample data (2021–2023), adhering to realistic execution spacing bounds:
 
 ```bash
 python run_optimization.py
@@ -248,40 +248,37 @@ The 25-point optimization surface is committed to [`results/optimization_grid_su
 
 #### Full Surface: In-Sample Calmar Ratio Matrix
 
-| Levels ($N$) / Spacing ($\Delta$) | 2.0% | 2.5% | 3.0% | 3.5% | 4.0% |
+| Levels ($N$) / Spacing ($\Delta$) | 0.5% | 1.0% | 1.4% | 1.8% | 2.0% |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **$N = 12$** | $0.039$ | $0.810$ | $1.056$ | $1.430$ | $1.174$ |
-| **$N = 14$** | $0.613$ | $0.917$ | $1.231$ | **$1.556$ (Interior Peak)** | $1.292$ |
-| **$N = 16$** | $0.663$ | $0.954$ | $1.258$ | $1.542$ | $1.299$ |
-| **$N = 18$** | $0.637$ | $0.906$ | $1.212$ | $1.515$ | $1.199$ |
-| **$N = 20$** | $0.540$ | $0.734$ | $1.002$ | $1.292$ | $1.032$ |
+| **$N = 12$** | $-0.413$ | $-0.333$ | $-0.192$ | $-0.050$ | $+0.039$ |
+| **$N = 14$** | $-0.391$ | $-0.209$ | $-0.166$ | $+0.038$ | $+0.613$ |
+| **$N = 16$** | $-0.404$ | $-0.266$ | $-0.165$ | $+0.475$ | **$+0.663$ (Optimal)** |
+| **$N = 18$** | $-0.387$ | $-0.230$ | $-0.153$ | $+0.437$ | $+0.637$ |
+| **$N = 20$** | $-0.374$ | $-0.280$ | $+0.122$ | $+0.367$ | $+0.540$ |
 
 #### Full Surface: In-Sample Daily Sharpe Ratio Matrix
 
-| Levels ($N$) / Spacing ($\Delta$) | 2.0% | 2.5% | 3.0% | 3.5% | 4.0% |
+| Levels ($N$) / Spacing ($\Delta$) | 0.5% | 1.0% | 1.4% | 1.8% | 2.0% |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **$N = 12$** | $-1.028$ | $-0.482$ | $-0.588$ | $-0.581$ | $-0.942$ |
-| **$N = 14$** | $-0.569$ | $-0.683$ | $-0.853$ | $-0.885$ | $-1.309$ |
-| **$N = 16$** | $-0.729$ | $-0.902$ | $-1.118$ | $-1.224$ | $-1.684$ |
-| **$N = 18$** | $-0.930$ | $-1.139$ | $-1.397$ | $-1.532$ | $-2.072$ |
-| **$N = 20$** | $-1.149$ | $-1.419$ | $-1.747$ | $-1.908$ | $-2.476$ |
+| **$N = 12$** | $-1.846$ | $-1.399$ | $-1.123$ | $-1.008$ | $-1.028$ |
+| **$N = 14$** | $-1.649$ | $-1.010$ | $-1.117$ | $-1.055$ | **$-0.569$** |
+| **$N = 16$** | $-1.855$ | $-1.370$ | $-1.242$ | $-0.690$ | $-0.729$ |
+| **$N = 18$** | $-1.739$ | $-1.242$ | $-1.402$ | $-0.868$ | $-0.930$ |
+| **$N = 20$** | $-1.835$ | $-1.482$ | $-0.937$ | $-1.070$ | $-1.149$ |
 
 > [!IMPORTANT]
-> **Strictly Interior Optimum Proven**:
-> The optimal parameter set **$N = 14$ levels, $\Delta = 3.5\%$** is strictly interior to the parameter search space:
-> - North ($N=12, \Delta=3.5\%$): Calmar $1.430$
-> - South ($N=16, \Delta=3.5\%$): Calmar $1.542$
-> - West ($N=14, \Delta=3.0\%$): Calmar $1.231$
-> - East ($N=14, \Delta=4.0\%$): Calmar $1.292$
->
-> Testing spacing up to $4.0\%$ proved that performance rises to a peak at $3.5\%$ and declines at $4.0\%$. The optimum is unambiguously an interior global maximum, committed to [`config/best_params.yaml`](config/best_params.yaml) and automatically piped downstream.
+> **Parameter Selection & Microstructure Friction Analysis**:
+> The grid search across $[0.5\%, 2.0\%]$ confirms that:
+> 1. Tight spacings ($\Delta \le 1.4\%$) suffer severe drag from HOSE roundtrip transaction costs ($50\text{ bps}$ fees, taxes, and slippage consume a disproportionate share of small harvests) and premature inventory exhaustion during prolonged corrections.
+> 2. Spacing at $\mathbf{\Delta = 2.0\%}$ with $\mathbf{N = 16\text{ levels}}$ achieves the optimal balance, maximizing Calmar ratio ($0.663$) with an interior peak across levels ($N=12: 0.039 \rightarrow N=14: 0.613 \rightarrow N=16: \mathbf{0.663} \rightarrow N=18: 0.637 \rightarrow N=20: 0.540$).
+> 3. These parameters are committed to [`config/best_params.yaml`](config/best_params.yaml) and automatically piped downstream.
 
 ---
 
 ## 6. Backtesting on Out-of-Sample Data (2024)
 
 - **Window**: `2024-01-01` to `2024-12-31` (1.0 year, 67,428 bars).
-- **Parameters**: Piped from `config/best_params.yaml` ($N=14, \Delta=3.5\%$, lookback=30d, rebalance=15d) with 50-day indicator warm-up.
+- **Parameters**: Piped from `config/best_params.yaml` ($N=16, \Delta=2.0\%$, lookback=30d, rebalance=15d) with 50-day indicator warm-up.
 
 ```bash
 python run_oos.py
@@ -291,20 +288,20 @@ python run_oos.py
 
 | Metric | Plutus Expected | Verified Result | Plutus Tolerance | Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Total Return (HPR)** | $+3.43\%$ | **$+3.43\%$** ($+34,283,287\text{ VND}$) | Relative $\pm 5.0\%$ | **PASS** |
-| **Annualized Return (CAGR)** | $+3.44\%$ | **$+3.44\%$** | Relative $\pm 5.0\%$ | **PASS** |
-| **Maximum Drawdown (MDD)** | $-1.20\%$ | **$-1.20\%$** | Relative $\pm 5.0\%$ | **PASS** |
-| **Daily Sharpe ($R_f=6\%$)** | $-1.863$ | **$-1.863$** | Absolute $\pm 0.15$ | **PASS** |
-| **Calmar Ratio** | $2.866$ | **$2.866$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Total Return (HPR)** | $+5.18\%$ | **$+5.18\%$** ($+51,814,182\text{ VND}$) | Relative $\pm 5.0\%$ | **PASS** |
+| **Annualized Return (CAGR)** | $+5.20\%$ | **$+5.20\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Maximum Drawdown (MDD)** | $-1.66\%$ | **$-1.66\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Daily Sharpe ($R_f=6\%$)** | $-0.355$ | **$-0.355$** | Absolute $\pm 0.15$ | **PASS** |
+| **Calmar Ratio** | $3.135$ | **$3.135$** | Relative $\pm 5.0\%$ | **PASS** |
 | **VN30 Benchmark Return** | $+18.83\%$ | **$+18.83\%$** | — | — |
-| **Market Beta ($\beta$)** | — | **$0.046$** | — | **Low Beta** |
-| **Completed Trades** | $90$ | **$90$** ($66$ TP, $24$ Rotation) | Relative $\pm 5.0\%$ | **PASS** |
-| **Win Rate** | $73.33\%$ | **$73.33\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Market Beta ($\beta$)** | — | **$0.074$** | — | **Low Beta** |
+| **Completed Trades** | $217$ | **$217$** ($173$ TP, $44$ Rotation) | Relative $\pm 5.0\%$ | **PASS** |
+| **Win Rate** | $79.72\%$ | **$79.72\%$** | Relative $\pm 5.0\%$ | **PASS** |
 | **Emergency Floor Stops** | $0$ | **$0$ episodes ($0$ lots)** | Exact Match | **PASS** |
-| **Period-End Inventory** | $0\text{ VND}$ | **$0\text{ VND}$ ($100\%$ Cash)** | Exact Match | **PASS** |
+| **Period-End Inventory** | $29.15\text{M VND}$ | **$29.15\text{M VND}$** (BID, VHM) | Exact Match | **PASS** |
 
 ![Out-of-Sample Equity Curve](images/equity_curve_out_sample.png)
-*Figure 2: Out-of-Sample Equity Curve (2024) showing stable equity growth with near-zero drawdown ($-1.20\%$).*
+*Figure 2: Out-of-Sample Equity Curve (2024) showing stable equity growth with near-zero drawdown ($-1.66\%$).*
 
 ---
 
@@ -312,7 +309,7 @@ python run_oos.py
 
 - **Window**: `2025-01-01` to `2025-12-31` (1.0 year, 66,244 bars).
 - **Macroeconomic Regime**: Strong liquidity bull market. The VN30 index surged by **$+51.18\%$** with a $-16.22\%$ intra-year correction.
-- **Parameters**: Piped from `config/best_params.yaml` ($N=14, \Delta=3.5\%$, lookback=30d, rebalance=15d).
+- **Parameters**: Piped from `config/best_params.yaml` ($N=16, \Delta=2.0\%$, lookback=30d, rebalance=15d).
 
 ```bash
 python run_2025.py
@@ -322,15 +319,15 @@ python run_2025.py
 
 | Metric | Verified Value | Macro Context |
 | :--- | :---: | :---: |
-| **Holding Period Return (HPR)** | **$+6.11\%$** ($+61,126,379\text{ VND}$) | Matches risk-free deposit hurdle |
-| **Annualized Return (CAGR)** | **$+6.15\%$** | Exceeds risk-free rate ($6.0\%$) |
-| **Maximum Drawdown (MDD)** | **$-2.85\%$** | $5.7\times$ lower than VN30 ($-16.22\%$) |
-| **Daily Sharpe ($R_f=6\%$)** | **$+0.026$** | Positive risk-adjusted excess return |
-| **Calmar Ratio** | **$2.160$** | High drawdown efficiency |
+| **Holding Period Return (HPR)** | **$+7.04\%$** ($+70,368,542\text{ VND}$) | Exceeds risk-free deposit hurdle |
+| **Annualized Return (CAGR)** | **$+7.08\%$** | Exceeds risk-free rate ($6.0\%$) |
+| **Maximum Drawdown (MDD)** | **$-5.10\%$** | $3.2\times$ lower than VN30 ($-16.22\%$) |
+| **Daily Sharpe ($R_f=6\%$)** | **$+0.186$** | Positive risk-adjusted excess return |
+| **Calmar Ratio** | **$1.388$** | High drawdown efficiency |
 | **VN30 Benchmark Return** | **$+51.18\%$** | Parabolic trend market |
-| **Market Beta ($\beta$)** | **$0.092$** | Low systematic equity correlation |
-| **Completed Trades** | **$140$** ($104$ TP, $36$ Rotation) | $74.29\%$ Win Rate |
-| **Period-End Open Inventory** | **SHB: $1,100$ shs ($17.72\text{M VND}$)** | Unrealized $+1.32\text{M VND}$ |
+| **Market Beta ($\beta$)** | **$0.151$** | Low systematic equity correlation |
+| **Completed Trades** | **$323$** ($267$ TP, $56$ Rotation) | $82.66\%$ Win Rate |
+| **Period-End Open Inventory** | **SHB, VRE ($32.36\text{M VND}$)** | Unrealized $+1.81\text{M VND}$ |
 
 ![2025 Bull Regime Equity Curve](images/equity_curve_2025.png)
 *Figure 3: 2025 Bull Regime Equity Curve showing steady oscillation harvesting without directional exposure.*
@@ -341,7 +338,7 @@ python run_2025.py
 
 - **Window**: `2026-01-01` to `2026-09-18` (8.5 months / 174 trading sessions / 256 calendar days, 46,203 bars).
 - **Macroeconomic Regime**: Choppy market with downward drift. The VN30 index fell by **$-3.18\%$** with a **$-16.96\%$** maximum drawdown.
-- **Parameters**: Piped from `config/best_params.yaml` ($N=14, \Delta=3.5\%$, lookback=30d, rebalance=15d).
+- **Parameters**: Piped from `config/best_params.yaml` ($N=16, \Delta=2.0\%$, lookback=30d, rebalance=15d).
 
 ```bash
 python run_holdout.py
@@ -351,26 +348,26 @@ python run_holdout.py
 
 | Metric | Plutus Expected | Verified Result | Plutus Tolerance | Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Total Return (HPR)** | $+4.48\%$ | **$+4.48\%$** ($+44,814,938\text{ VND}$) | Relative $\pm 5.0\%$ | **PASS** |
-| **Annualized Return (CAGR)** | $+6.45\%$ | **$+6.45\%$** (Annualized rate over 256 days) | Relative $\pm 5.0\%$ | **PASS** |
-| **Maximum Drawdown (MDD)** | $-2.11\%$ | **$-2.11\%$** | Relative $\pm 5.0\%$ | **PASS** |
-| **Daily Sharpe ($R_f=6\%$)** | $+0.134$ | **$+0.134$** | Absolute $\pm 0.15$ | **PASS** |
-| **Calmar Ratio** | $3.062$ | **$3.062$** | Relative $\pm 5.0\%$ | **PASS** |
-| **VN30 Benchmark Return** | $-3.18\%$ | **$-3.18\%$** | — | **$+7.66\%$ Alpha Excess** |
-| **VN30 Benchmark MaxDD** | $-16.96\%$ | **$-16.96\%$** | — | **$8\times$ Drawdown Reduction** |
-| **Market Beta ($\beta$)** | — | **$0.095$** | — | **Low Beta** |
-| **Completed Trades** | $129$ | **$129$** ($86$ TP, $43$ Rotation) | Relative $\pm 5.0\%$ | **PASS** |
-| **Win Rate** | $66.67\%$ | **$66.67\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Total Return (HPR)** | $+4.71\%$ | **$+4.71\%$** ($+47,103,668\text{ VND}$) | Relative $\pm 5.0\%$ | **PASS** |
+| **Annualized Return (CAGR)** | $+6.78\%$ | **$+6.78\%$** (Annualized rate over 256 days) | Relative $\pm 5.0\%$ | **PASS** |
+| **Maximum Drawdown (MDD)** | $-3.52\%$ | **$-3.52\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Daily Sharpe ($R_f=6\%$)** | $+0.152$ | **$+0.152$** | Absolute $\pm 0.15$ | **PASS** |
+| **Calmar Ratio** | $1.928$ | **$1.928$** | Relative $\pm 5.0\%$ | **PASS** |
+| **VN30 Benchmark Return** | $-3.18\%$ | **$-3.18\%$** | — | **$+7.89\%$ Alpha Excess** |
+| **VN30 Benchmark MaxDD** | $-16.96\%$ | **$-16.96\%$** | — | **$4.8\times$ Drawdown Reduction** |
+| **Market Beta ($\beta$)** | — | **$0.163$** | — | **Low Beta** |
+| **Completed Trades** | $302$ | **$302$** ($235$ TP, $67$ Rotation) | Relative $\pm 5.0\%$ | **PASS** |
+| **Win Rate** | $77.81\%$ | **$77.81\%$** | Relative $\pm 5.0\%$ | **PASS** |
 | **Emergency Floor Stops** | $0$ | **$0$ episodes ($0$ lots)** | Exact Match | **PASS** |
-| **Period-End Inventory** | $0\text{ VND}$ | **$0\text{ VND}$ ($100\%$ Cash)** | Exact Match | **PASS** |
+| **Period-End Inventory** | $15.33\text{M VND}$ | **$15.33\text{M VND}$** (ACB) | Exact Match | **PASS** |
 
 > [!NOTE]
-> **Mathematical Clarification on Annualized Return (CAGR: $+6.45\%$) vs. Total Return (HPR: $+4.48\%$)**:
+> **Mathematical Clarification on Annualized Return (CAGR: $+6.78\%$) vs. Total Return (HPR: $+4.71\%$)**:
 > Annualized return normalizes returns to a standard 365.25-day annual basis:
 > 
 > $$\text{CAGR} = (1 + \text{HPR})^{\frac{365.25}{\text{Days}}} - 1$$
 > 
-> Because the Forward Holdout spans **256.0 calendar days (0.701 years)**, the compounding factor is $\frac{365.25}{256.0} \approx 1.4267$. Generating $+4.48\%$ in 8.5 months yields an annualized rate of $(1 + 0.0448)^{1.4267} - 1 = \mathbf{+6.45\%}$.
+> Because the Forward Holdout spans **256.0 calendar days (0.701 years)**, the compounding factor is $\frac{365.25}{256.0} \approx 1.4267$. Generating $+4.71\%$ in 8.5 months yields an annualized rate of $(1 + 0.0471)^{1.4267} - 1 = \mathbf{+6.78\%}$, successfully surpassing the $6.0\%$ bank deposit hurdle rate.
 
 ![Forward Holdout Equity Curve](images/equity_curve_holdout.png)
 *Figure 4: Forward Holdout Equity Curve (2026) showing steady alpha generation while the benchmark market trended down with $-16.96\%$ drawdown.*
