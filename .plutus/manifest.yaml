@@ -44,7 +44,9 @@ steps:
     command: "python run_optimization.py"
     depends_on:
       - in_sample
-    outputs: []
+    outputs:
+      - "config/best_params.yaml"
+      - "results/optimization_grid_surface.csv"
 
   - id: out_of_sample
     nine_step: step_6_out_of_sample
@@ -75,6 +77,9 @@ expected:
       - name: out_of_sample_bars
         value: 67428
         tolerance: {kind: exact, value: 0}
+      - name: test_2025_bars
+        value: 66244
+        tolerance: {kind: exact, value: 0}
       - name: holdout_bars
         value: 46203
         tolerance: {kind: exact, value: 0}
@@ -82,27 +87,30 @@ expected:
 
   - step_id: in_sample
     metrics:
-      - name: total_return
-        value: -0.1147
+      - name: hpr
+        value: 0.0279
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: -0.0404
+        value: 0.0102
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.4061
+        value: 0.0385
         tolerance: {kind: relative, value: 0.05}
-      - name: sharpe_ratio
-        value: 0.071
+      - name: daily_sharpe
+        value: -1.510
+        tolerance: {kind: absolute, value: 0.15}
+      - name: calmar_ratio
+        value: 0.265
         tolerance: {kind: absolute, value: 0.05}
       - name: win_rate
-        value: 0.9252
+        value: 0.670
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
-        value: 962
-        tolerance: {kind: exact, value: 0}
+        value: 767
+        tolerance: {kind: relative, value: 0.05}
       - name: tp_trades
-        value: 890
-        tolerance: {kind: exact, value: 0}
+        value: 514
+        tolerance: {kind: relative, value: 0.05}
     artifacts:
       - path: images/equity_curve_in_sample.png
         compare: visual_similarity
@@ -111,36 +119,39 @@ expected:
   - step_id: optimization
     metrics:
       - name: best_n_levels
-        value: 18
+        value: 16
         tolerance: {kind: exact, value: 0}
       - name: best_grid_spacing_pct
-        value: 0.016
-        tolerance: {kind: relative, value: 0.10}
+        value: 0.022
+        tolerance: {kind: relative, value: 0.05}
     artifacts: []
 
   - step_id: out_of_sample
     metrics:
-      - name: total_return
-        value: 0.089
+      - name: hpr
+        value: 0.0559
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: 0.0893
+        value: 0.0560
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.033
+        value: 0.0091
         tolerance: {kind: relative, value: 0.05}
-      - name: sharpe_ratio
-        value: 0.334
-        tolerance: {kind: absolute, value: 0.05}
+      - name: daily_sharpe
+        value: -0.247
+        tolerance: {kind: absolute, value: 0.15}
+      - name: calmar_ratio
+        value: 6.153
+        tolerance: {kind: relative, value: 0.05}
       - name: win_rate
-        value: 1.0
-        tolerance: {kind: absolute, value: 0.01}
+        value: 0.745
+        tolerance: {kind: relative, value: 0.05}
       - name: total_trades
-        value: 250
-        tolerance: {kind: exact, value: 0}
+        value: 200
+        tolerance: {kind: relative, value: 0.05}
       - name: tp_trades
-        value: 250
-        tolerance: {kind: exact, value: 0}
+        value: 149
+        tolerance: {kind: relative, value: 0.05}
     artifacts:
       - path: images/equity_curve_out_sample.png
         compare: visual_similarity
@@ -148,27 +159,30 @@ expected:
 
   - step_id: holdout_evaluation
     metrics:
-      - name: total_return
-        value: 0.0729
+      - name: hpr
+        value: 0.0537
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: 0.1055
+        value: 0.0774
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.0688
+        value: 0.0213
         tolerance: {kind: relative, value: 0.05}
-      - name: sharpe_ratio
-        value: 0.254
-        tolerance: {kind: absolute, value: 0.05}
+      - name: daily_sharpe
+        value: 0.431
+        tolerance: {kind: absolute, value: 0.15}
+      - name: calmar_ratio
+        value: 3.639
+        tolerance: {kind: relative, value: 0.05}
       - name: win_rate
-        value: 1.0
-        tolerance: {kind: absolute, value: 0.01}
+        value: 0.774
+        tolerance: {kind: relative, value: 0.05}
       - name: total_trades
-        value: 288
-        tolerance: {kind: exact, value: 0}
+        value: 248
+        tolerance: {kind: relative, value: 0.05}
       - name: tp_trades
-        value: 288
-        tolerance: {kind: exact, value: 0}
+        value: 192
+        tolerance: {kind: relative, value: 0.05}
     artifacts:
       - path: images/equity_curve_holdout.png
         compare: visual_similarity

@@ -1,448 +1,437 @@
 # Kaufman-Range-Grid: Non-Parametric Kaufman ER Spot Grid Trading System
-> Non-parametric equity oscillation harvesting engine with zero directional leverage, strictly compliant with HOSE T+2.5 settlement rules.
+> Systematic equity oscillation harvesting engine with zero directional leverage, fully compliant with HOSE trading rules, active-session $T+2$ settlement, and institutional 50 bps execution friction.
 
-## Abstract
-
-The **Kaufman-Range-Grid** system is a systematic algorithmic trading strategy engineered specifically for the Ho Chi Minh Stock Exchange (HOSE). It combines Perry Kaufman's non-parametric **Efficiency Ratio (ER)** as an equity selection filter with an **18-level geometric grid execution engine**, harvesting recurring mean-reverting price oscillations without derivative exposure, margin calls, or directional leverage.
-
-The strategy was developed and evaluated end-to-end on **HOSE 30-minute OHLCV bar feeds across the VN30 constituent universe from 2021 to 2026** following the [9-step Development Process](file:///Users/ttt/Final_Projects_v1/book.md) and the [Plutus Reproducibility Standard](https://github.com/algotrade-plutus/plutus-guideline). On the in-sample period (2021–2023, encompassing the historic -35% VN30 market crash), the strategy harvested **+262,036,062 VND** in closed oscillation profits with an in-sample return of **-11.47%** (significantly outperforming the benchmark crash); on the out-of-sample period (2024), it delivered **+8.90% Net Return** with a **100.0% Win Rate** and a maximum drawdown of only **-3.30%**; on the blind forward holdout period (January–September 2026, 8.5 months), it achieved **+7.29% Net Return** (+10.55% Annualized) with a **100.0% Win Rate** and a maximum drawdown of **-6.88%**. Every reported metric is fully reproducible in an isolated Docker container via `plutus-verify` against committed groundtruth baselines.
+[![Plutus Standard](https://img.shields.io/badge/PLUTUS-v2.0%20Verified-brightgreen)](file:///.plutus/manifest.yaml)
+[![Python Version](https://img.shields.io/badge/Python-3.12-blue)](file:///requirements.txt)
+[![Market](https://img.shields.io/badge/Exchange-HOSE%20%7C%20VN30-orange)](file:///data)
+[![Transaction Costs](https://img.shields.io/badge/Costs-50%20bps%20Roundtrip-red)](file:///config/config.yaml)
+[![Time-Series Discipline](https://img.shields.io/badge/Discipline-Strict%20IS%20Optimization-purple)](file:///src/optimizer.py)
 
 ---
 
-## Introduction
+## Abstract
 
-Algorithmic trading in frontier and emerging markets like Vietnam presents distinct structural challenges:
-1. **Microstructure Frictions**: Under Ministry of Finance Circular 120/2020/TT-BTC, HOSE enforces a strict $T+2.5$ settlement cycle (stocks purchased on day $T$ can only be legally sold after 13:00 on $T+2$). Intraday scalping and unhedged high-frequency day-trading are legally prohibited.
-2. **Retail Noise & Choppy Consolidations**: The market is heavily dominated by individual retail investors (>85% of volume), leading to prolonged sideways consolidations and frequent whipsaws that degrade conventional trend-following indicators (e.g., Moving Average crossovers, MACD, Supertrend).
-3. **Downside Risk & Margin Calls**: Directional strategies frequently suffer catastrophic drawdowns during secular bear markets (such as the 2022 market decline).
+The **Kaufman-Range-Grid** system is a systematic, quantitative trading strategy engineered specifically for the microstructure of the Ho Chi Minh Stock Exchange (HOSE). It combines Perry Kaufman's non-parametric **Efficiency Ratio (ER)** as a regime-selection filter with an **adaptive geometric grid execution engine**, harvesting recurring mean-reverting price oscillations without derivative exposure, margin calls, or directional leverage.
 
-Rather than attempting to forecast directional breakouts, the **Kaufman-Range-Grid** system monetizes local price dispersion. By deploying an array of pre-calculated geometric limit orders around a moving fair-value anchor, the strategy supplies liquidity during dips and liquidates positions on technical rebounds. Perry Kaufman's Efficiency Ratio is employed non-parametrically to systematically identify equities trapped in stationary, oscillating regimes while filtering out trending stocks that threaten grid integrity.
+The strategy was developed and evaluated end-to-end on **HOSE 30-minute OHLCV bar feeds across the liquid VN30 constituent universe from 2021 to 2026**, adhering strictly to the [9-step Development Process](file:///Users/ttt/Final_Projects_v1/book.md) and the [Plutus Reproducibility Standard](https://github.com/algotrade-plutus/plutus-guideline). All hyperparameters were selected strictly on the In-Sample period (2021–2023) using an exhaustive 25-point grid search and committed to [`config/best_params.yaml`](file:///Users/ttt/Final_Projects_v1/strategies/minimalist_er_grid/config/best_params.yaml) before out-of-sample exposure.
+
+### Multi-Period Performance Overview (Optimal $N=16, \Delta=2.2\%$)
+
+| Evaluation Split | Calendar Window | Strategy HPR | Annual Return (CAGR) | Strategy MaxDD | VN30 Benchmark HPR | VN30 Benchmark MaxDD | Excess Return | Market Beta ($\beta$) | Daily Sharpe ($R_f=6\%$) | Calmar Ratio | Completed Trades (Win Rate) | Period-End Open Inventory |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **In-Sample** | 2021–2023 (3.0 yrs) | **$+2.79\%$** ($+27.9\text{M}$) | $+1.02\%$ | **$-3.85\%$** | $-11.42\%$ | **$-42.46\%$** | **$+14.21\%$** | **$0.083$** | $-1.510$ | $0.265$ | 767 ($67.0\%$) | None ($100\%$ Cash) |
+| **Out-of-Sample** | 2024 (1.0 yr) | **$+5.59\%$** ($+55.9\text{M}$) | $+5.60\%$ | **$-0.91\%$** | $+18.83\%$ | $-8.38\%$ | $-13.24\%$ | **$0.045$** | $-0.247$ | **$6.153$** | 200 ($74.5\%$) | POW: $3,000$ shs ($-176\text{k}$) |
+| **2025 Bull Test** | 2025 (1.0 yr) | **$+8.57\%$** ($+85.7\text{M}$) | $+8.62\%$ | **$-3.38\%$** | $+51.18\%$ | $-16.22\%$ | $-42.61\%$ | **$0.125$** | **$+0.543$** | **$2.549$** | 329 ($79.6\%$) | GVR: $2,100$ shs ($-1.31\text{M}$) |
+| **Forward Holdout** | 2026 (8.5 mos) | **$+5.37\%$** ($+53.7\text{M}$) | **$+7.74\%$** | **$-2.13\%$** | $-3.18\%$ | **$-16.96\%$** | **$+8.55\%$** | **$0.094$** | **$+0.431$** | **$3.639$** | 248 ($77.4\%$) | $3$ stocks: $1,200$ shs ($+554\text{k}$) |
+
+Every metric reported above is fully reproducible via standalone scripts and validated against `.plutus/manifest.yaml`.
+
+---
+
+## Introduction & HOSE Microstructure
+
+Algorithmic trading in Vietnam's equity market requires rigorous accommodation of exchange-specific structural constraints:
+1. **Settlement Restrictions (Circular 120/2020/TT-BTC)**: HOSE enforces an active-session $T+2$ settlement cycle. Shares purchased on trading day $T$ can only be legally sold after 13:00 on $T+2$. Unsettled inventory cannot be liquidated intraday, rendering unhedged scalping illegal and unfeasible.
+2. **Integer Board Lots**: HOSE mandates standard board lots of 100 shares. Fractional share trading is prohibited.
+3. **Institutional Execution Friction (50 bps Roundtrip)**:
+   - Brokerage Buy Commission: $15\text{ bps}$ ($0.15\%$)
+   - Brokerage Sell Commission: $15\text{ bps}$ ($0.15\%$)
+   - Statutory Sell Tax (Ministry of Finance): $10\text{ bps}$ ($0.10\%$)
+   - Conservative Gap Slippage: $5\text{ bps}$ buy $+ 5\text{ bps}$ sell ($0.10\%$)
+   - **Total Roundtrip Friction: $50\text{ bps}$ ($0.50\%$)** incorporated into every simulated order fill.
+4. **Retail Domination & Range-Bound Chop**: With individual retail participants accounting for over $85\%$ of trading volume, HOSE equities exhibit extensive periods of stationary consolidation accompanied by false breakout whipsaws. Conventional trend-following systems suffer repeated drawdown cycles.
+
+The **Kaufman-Range-Grid** system directly monetizes this market behavior by supplying liquidity on geometric dips and capturing incremental profits on mean-reverting rebounds, while maintaining ultra-low market beta ($\beta \approx 0.05 - 0.12$).
 
 ---
 
 ## 1. Forming Algorithm Hypothesis
 
-The core thesis rests on the structural difference between trending and oscillating market regimes:
+### Mathematical Definition of Kaufman Efficiency Ratio (ER)
+Perry Kaufman defined market efficiency as the ratio of directional price displacement to the total path traveled over a historical window of $k$ periods:
 
-$$
-\text{Efficiency Ratio (ER)} = \frac{|\Delta P_N|}{\sum_{i=1}^N |\Delta P_i|} = \frac{|P_t - P_{t-N}|}{\sum_{i=1}^N |P_i - P_{i-1}|}
-$$
+$$\text{ER}_t(k) = \frac{|\Delta P_k|}{\sum_{i=1}^k |\Delta P_i|} = \frac{|P_t - P_{t-k}|}{\sum_{i=1}^k |P_{t-i+1} - P_{t-i}|}$$
 
 Where:
-- $P_t$ is the closing price at time $t$.
-- $N$ is the observation window (fixed at $N = 40$ trading days, equivalent to 2 business months).
-- The numerator $|\Delta P_N|$ represents the net directional price displacement.
-- The denominator $\sum |\Delta P_i|$ represents the total path traveled (volatility).
+- $P_t$ is the closing price on day $t$.
+- $k$ is the lookback window ($k = 40$ trading days, approximately two business months).
+- The numerator represents net directional displacement.
+- The denominator represents the cumulative path volatility.
 
-### Mathematical Properties & Trading Hypothesis:
-- **$ER \to 1.0$ (High Efficiency)**: Price travels in a direct, uninterrupted trend with minimal retracement. Unhedged grid systems deployed on high ER stocks accumulate one-sided inventory during downtrends and hit stop losses.
-- **$ER \to 0.0$ (Low Efficiency / Stationary Oscillation)**: Price oscillates continuously back and forth, covering extensive total distance while resulting in near-zero net displacement. This is the mathematically optimal condition for grid order recycling: limit orders are filled and liquidated in rapid succession.
-- **The Core Hypothesis**: *Equities occupying the lowest ER quartile on HOSE exhibit stationary mean-reverting behavior, maximizing grid take-profit roundtrips while minimizing directional exposure. Gating grid deployment by a medium-term fair-value anchor (50-period SMA proximity within $\pm 3\%$) prevents entering equities during severe trend detachments.*
+```mermaid
+graph TD
+    A[40-Day Price Window] --> B[Calculate Directional Displacement |Pt - Pt-k|]
+    A --> C[Calculate Cumulative Absolute Path Sum]
+    B & C --> D[Kaufman Efficiency Ratio ER]
+    D -->|ER -> 1.0 Trending| E[Exclude from Grid: Danger of Accumulating Losing Lots]
+    D -->|ER -> 0.0 Stationary Oscillation| F[Qualify for Grid Whitelist: High Take-Profit Recurrence]
+```
+
+### Regime Gating Hypothesis
+- **$\text{ER} \to 1.0$ (High Efficiency / Trending Regime)**: Price travels monotonically with minimal retracement. Spot grids deployed on high ER stocks accumulate losing tranches during secular declines.
+- **$\text{ER} \to 0.0$ (Low Efficiency / Stationary Oscillation)**: Price oscillates continuously across a wide band while returning close to its origin. This creates the mathematically ideal substrate for grid order recycling: limit buy orders fill on dips and take-profit sell orders execute in rapid succession.
+- **Anchor Proximity Gate (Rule 1)**: Even among low ER stocks, equities detaching from their medium-term fair value must be rejected. The strategy filters for equities whose price is within $\pm 3\%$ of their 50-period Simple Moving Average ($\text{SMA}_{50}$), preventing entry during late-stage breakdown detachments.
 
 ---
 
-## 2. Data Preparation
+## 2. Data Preparation & Corporate Actions
 
-### Data Sources & Universe Specifications
-- **Data Source**: Official HOSE 30-minute OHLCV bar feeds.
-- **Constituent Universe**: Liquid VN30 basket constituents (re-evaluated point-in-time every 10 trading days).
-- **Evaluation Splits**:
-  - **In-Sample (IS)**: `2021-01-15` to `2023-12-29` (3 full calendar years, 722 trading days, 192,886 bars) — Captures the historic 2021 bull run and the brutal 2022 secular bear market (-35% VN30).
-  - **Out-of-Sample (OOS)**: `2024-01-02` to `2024-12-31` (1 full calendar year, 250 trading days, 67,428 bars) — Range-bound consolidation and recovery.
-  - **Forward Blind Holdout**: `2026-01-05` to `2026-09-18` (8.5 months, 174 trading days, 46,203 bars) — Blind evaluation under choppy downward surges (-3.44% VN30 drift).
-  - *Data Split Rationale*: The year **2025 was deliberately kept as an embargo buffer (gap year)** between OOS and Forward Holdout to eliminate autocorrelation bleed and ensure strict statistical independence for blind testing.
+### Dataset Characteristics
+- **Frequency**: 30-minute OHLCV continuous bar feeds.
+- **Universe**: Liquid VN30 basket constituents dynamically tracked across time.
+- **Adjustment Factors**: All splits, cash dividends, and rights offerings are adjusted using point-in-time adjustment factors stored in `data/corporate_actions/adjustment_factors.parquet`.
+- **Pre-Split Indicator Warm-Up (P-4)**: To eliminate idle startup delays and simulate continuous live operations, each out-of-sample split prepends 40 trading days of prior historical sessions marked with `is_warmup=True`. Indicators ($\text{ER}_{40\text{d}}$, $\text{SMA}_{50}$) are fully populated on Day 1, allowing active trading immediately at the opening bell.
 
-### Data Hygiene & Zero Lookahead Bias
-1. **Strict Walk-Forward Separation**:
-   - The ER selection signal is computed strictly using historical daily bars over $[t-40, t-1]$ relative to rebalancing day $t$.
-   - The trading and grid execution window is evaluated strictly on forward bars $[t, t+9]$.
-   - There is zero overlapping lookahead or future price leakage.
-2. **Point-in-Time Universe Selection**:
-   - Equities are dynamically selected every 10 days based solely on information available prior to market open on day $t$. No survivorship bias is introduced.
-3. **Unit Consistency & Split Adjustments**:
-   - All prices are adjusted for corporate actions and cash dividends, and stored in standard integer VND units (`price * 1000.0`).
-4. **Execution Friction & Realistic Cost Model**:
-   - Brokerage Commission: `15 bps` (0.15%).
-   - Ministry of Finance Sell Tax: `10 bps` (0.10%).
-   - Slippage on Gap Opens: `5 bps` (0.05%).
-   - Total round-trip execution friction: `30 bps` (0.30%).
-
-### Repository Data Layout
-```text
-strategies/minimalist_er_grid/
-├── data/
-│   ├── in_sample/           # 192,886 bars (2021-2023)
-│   ├── out_of_sample/       # 67,428 bars (2024)
-│   ├── forward_holdout/     # 46,203 bars (2025-2026)
-│   ├── benchmark/           # VN30 index benchmark series
-│   └── data_summary.json    # Verified checksum & record count
+```
+data/
+├── in_sample/           # 192,886 bars (2021-01-01 to 2024-01-01)
+├── out_of_sample/       #  67,428 bars (2024-01-01 to 2025-01-01)
+├── test_2025/           #  66,244 bars (2025-01-01 to 2025-12-31)
+├── forward_holdout/     #  46,203 bars (2026-01-01 to 2026-10-01)
+├── corporate_actions/   # Point-in-time dividend and split adjustment factors
+└── benchmark/           # VN30 index daily and 30m series (2019-2026)
 ```
 
-### Reproducible Data Preparation Command
+### Data Integrity Verification Command
 ```bash
 python run_data_prep.py
 ```
 
+Output checksum validation:
+```text
+In-Sample dataset verified:     192,886 bars (2021-01-01 to 2024-01-01)
+Out-of-Sample dataset verified: 67,428 bars (2024-01-01 to 2025-01-01)
+2025 Bull Test dataset verified: 66,244 bars (2025-01-01 to 2025-12-31)
+Holdout dataset verified:       46,203 bars (2026-01-01 to 2026-10-01)
+All schemas and date boundaries validated successfully.
+```
+
 ---
 
-## 3. Transforming a Hypothesis to a Set of Rules
+## 3. Transforming Hypothesis to a Set of Rules
 
-The trading system translates the theoretical hypothesis into five deterministic execution rules:
-
-### Rule 1 — Non-Parametric Universe Selection & Gating Filter
+### Rule 1 — Universe Selection Sequence & Fair-Value Gating (`A-8`)
 Every 10 trading days at market open:
-1. Compute the 40-day Kaufman Efficiency Ratio for all VN30 constituents.
-2. Filter for stocks where the current price is within $\pm 3\%$ of the 50-period Simple Moving Average:
+1. Identify all active VN30 constituents.
+2. **First Filter**: Retain only equities whose current price is within $\pm 3\%$ of their 50-period Simple Moving Average:
 
-$$
-\frac{|P_t - \text{SMA}_{50}(t)|}{\text{SMA}_{50}(t)} \le 0.03
-$$
+$$\frac{|P_t - \text{SMA}_{50}(t)|}{\text{SMA}_{50}(t)} \le 0.03$$
 
-3. Rank qualifying equities by ER in ascending order and select the **top 4 lowest-ER stocks**.
+3. **Second Ranking**: Rank all qualifying equities by 40-day Kaufman Efficiency Ratio in ascending order.
+4. **Selection**: Select the **top 4 lowest-ER stocks** ($k=4$) to form the active trading whitelist.
 
-### Rule 2 — Equal Capital Partitioning & Tranche Sizing
-- Total portfolio capital $C_0$ (e.g., 1,000,000,000 VND) is divided equally across the 4 selected stocks:
+### Rule 2 — Dynamic Tranche Budgeting & Board Lot Truncation (`A-13`)
+- Total portfolio capital $C_0 = 1{,}000{,}000{,}000\text{ VND}$ is partitioned equally across the 4 selected stocks:
 
-$$
-C_{\text{stock}} = \frac{C_0}{4} = 250{,}000{,}000 \text{ VND}
-$$
+$$C_{\text{stock}} = \frac{C_0}{4} = 250{,}000{,}000\text{ VND}$$
 
-- Each stock's capital is divided into $N = 18$ equal tranches:
+- Each stock's capital is divided into $N = 16$ levels:
 
-$$
-w_k = \frac{C_{\text{stock}}}{18} \approx 13{,}888{,}888 \text{ VND}
-$$
+$$C_{\text{level}} = \frac{C_{\text{stock}}}{N} = \frac{250{,}000{,}000}{16} = 15{,}625{,}000\text{ VND}$$
 
-- Order quantities are constrained to HOSE standard board lots of 100 shares:
+- To guarantee strict compliance with HOSE 100-share board lot rules without cash deficits, share allocations use integer floor truncation:
 
-$$
-Q_k = \left\lfloor \frac{w_k}{\text{Buy Limit}_k \times 100} \right\rfloor \times 100
-$$
+$$S_k = \left\lfloor \frac{C_{\text{level}}}{P_k \times 100} \right\rfloor \times 100$$
 
 ### Rule 3 — Geometric Grid Deployment & Next-Bar Execution
-The initial anchor price $A_0$ is set to $\text{SMA}_{50}(t)$ at grid initialization. 18 geometric buy limit levels are deployed below the anchor:
+The initial anchor $A_0$ is established from the stock's $\text{SMA}_{50}$ at whitelist entry. 16 geometric buy limit levels are deployed below the anchor:
 
-$$
-\text{Buy Limit}_k = A_0 \times (1 - k \times 0.016) \quad \text{for } k \in \{1, 2, \dots, 18\}
-$$
+$$P_{\text{buy}, k} = A_0 \times (1 - k \times 0.022) \quad \text{for } k \in \{1, 2, \dots, 16\}$$
 
-For each filled tranche $k$, an associated take-profit limit order is immediately scheduled:
+For each filled tranche $k$, an associated take-profit sell limit order is immediately scheduled:
 
-$$
-\text{Target TP}_k = A_0 \times (1 - (k-1) \times 0.016)
-$$
+$$P_{\text{tp}, k} = A_0 \times (1 - (k - 1) \times 0.022)$$
 
-yielding a gross oscillation margin of $+1.60\%$ per cycle.
+yielding a gross oscillation margin of $+2.20\%$ ($+1.70\%$ net of 50 bps transaction costs) per roundtrip cycle.
 
-#### Microstructure Realism:
-- **Zero Same-Bar Lookahead**: Orders deployed at bar $t$ close become active strictly on bar $t+1$ (`active_from_ts = bar_ts + 1`).
-- **Pessimistic Gap-Down Execution**: If bar $t+1$ opens below the limit order ($\text{Open}_{t+1} < \text{Buy Limit}_k$), execution occurs at the **Open price plus 5 bps slippage**, rather than the favorable limit price.
+- **Microstructure Realism**: Orders scheduled at bar $t$ become active strictly on bar $t+1$.
+- **Adverse Gap Execution**: If bar $t+1$ opens below the limit order ($\text{Open}_{t+1} < P_{\text{buy}, k}$), the fill occurs at $\text{Open}_{t+1} \times (1 + 0.0005)$, modeling adverse opening slippage.
 
-### Rule 4 — Catastrophic Floor Stop with T+2.5 Settlement Enforcement
-To prevent indefinite capital drag during a secular macroeconomic collapse, a catastrophic floor stop is established 2 buffer levels below the deepest buy tier:
+### Rule 4 — Rotation Discipline & Orderly Liquidation (`A-7`)
+When a stock rotates off the 10-day active whitelist:
+1. **Immediate Buy Cancellation**: All unfilled buy limit orders are cancelled immediately. No new tranches may be acquired.
+2. **Orderly Liquidation Upon Legal Settlement**: Open inventory already legally settled ($T+2$) is liquidated at the next bar's close.
+3. **Pending Settlement Tracking**: Open tranches awaiting $T+2$ clearance are tagged as `pending_rotation_exit` and liquidated at the market opening price immediately upon legal clearance.
+- **Audit Verification**: This protocol completely eliminated unauthorized entries ($0\%$ off-whitelist buys across all evaluation windows).
 
-$$
-\text{Floor Stop} = A_0 \times (1 - (18 + 2) \times 0.016) = A_0 \times (1 - 0.320) = A_0 \times 0.680
-$$
+### Rule 5 — Emergency Floor Stop with Trading-Session Calendar (`A-3`, `A-12`)
+To protect against catastrophic structural failure:
 
-Under HOSE Circular 120/2020/TT-BTC, shares purchased cannot be sold before $T+2$ 13:00 PM:
-1. If price breaches $\text{Floor Stop}$, all further grid limit buying is immediately halted (`stop_triggered = True`).
-2. Shares already legally settled are liquidated immediately at market open.
-3. Unsettled shares are tagged as `pending_floor_stop = True` and liquidated strictly on their legal settlement bar (Day $T+2$, 13:00 PM) at the market open with adverse slippage.
+$$P_{\text{floor}} = A_0 \times (1 - (N + 2) \times 0.022) = A_0 \times (1 - 18 \times 0.022) = 0.604 \times A_0$$
 
-### Rule 5 — Dynamic Inventory-Proportional VN30F Derivative Short Hedge (Extension)
-To insulate the portfolio from broad market drawdowns while preserving spot grid harvest, an optional short derivative hedge can be overlaid:
-- Hedge Ratio:
+If price breaches $P_{\text{floor}}$, all grid buying halts immediately. Settled shares liquidate at market open, while unsettled shares liquidate on their legal settlement date determined via HOSE active trading sessions (`np.searchsorted` over actual business dates). Multiple tranches stopped out on the same date are consolidated into a single emergency liquidation episode (`stop_episodes`).
 
-$$
-h = \min\left(1.0, \frac{\text{Unsettled + Settled Stock Value}}{\text{Portfolio Equity}}\right)
-$$
-
-- Futures Contracts:
-
-$$
-N_{\text{VN30F}} = \left\lfloor \frac{\text{Stock Value} \times h}{P_{\text{VN30F}} \times 100{,}000} \right\rfloor
-$$
-
-- Short exposure scales dynamically with inventory accumulation and auto-winds down as grid take-profits execute.
-
-### Evaluation Metrics
-The strategy is evaluated against the exact metrics specified in `.plutus/manifest.yaml`:
-- **Total Return (HPR)**: Cumulative net portfolio percentage return net of all fees, taxes, and slippage.
-- **Annualized Return (CAGR)**: Geometric annual compounding rate.
-- **Maximum Drawdown (MaxDD)**: Peak-to-trough equity decline.
-- **Sharpe Ratio ($R_f = 6.0\%$)**: Risk-adjusted excess return over the Vietnam State Bank deposit benchmark rate.
-- **Win Rate**: Percentage of closed grid tranches exiting at take-profit target vs. floor stops.
-- **Total Trades & Take-Profit Trades**: Count of roundtrip transactions completed.
+### Rule 6 — Period-End Inventory Mark-to-Market Accounting (`A-4`)
+At the conclusion of each evaluation split, open positions are marked to market at the closing price of the final 30-minute bar. Unrealized profit/loss is reported explicitly alongside cash balances, avoiding artificial forced liquidations.
 
 ---
 
-## Implementation & Reproducibility
+## 4. Backtesting on In-Sample Data (2021–2023)
 
-The trading engine is packaged with standalone, deterministic execution scripts. All experiments run without network dependencies using local parquet datasets.
-
-### Environment Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/Tathao1t1/Minimalist_ER_Grid.git
-cd Minimalist_ER_Grid
-
-# Create and activate Python virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install locked dependencies
-pip install -r requirements.txt
-```
-
-### Deterministic Container Verification via PLUTUS
-
-The repository complies with the **PLUTUS Quantitative Research Standard** (`v2.0` specification). Reproduce every metric inside an isolated Docker container with [plutus-verify](https://github.com/algotrade-plutus/plutus-verify):
-
-```bash
-# Run isolated container verification audit
-plutus check .
-```
-
-`plutus check` builds the container, executes each pipeline step topologically, and validates that every metric and chart matches the committed baseline within strict tolerance limits.
-
----
-
-## 4. Backtesting on In-Sample Data
-
-- **Evaluation Window**: `2021-01-01` to `2023-12-31` (3 years, 192,886 bars).
-- **Macroeconomic Regime**: Includes the 2021 liquidity-driven bull market and the historic 2022 market decline where VN30 fell by -35.0%.
+- **Window**: `2021-01-01` to `2023-12-31` (3.0 years, 192,886 bars).
+- **Market Context**: Encompasses the 2021 liquidity boom followed by the severe 2022 market decline where the VN30 index plunged by $-42.46\%$.
 
 ```bash
 python run_is.py
 ```
 
-### In-Sample Verified Performance Metrics
+### In-Sample Verified Performance
 
-| Metric | Target Value | Baseline Result | Plutus Verification Tolerance |
-| :--- | :---: | :---: | :---: |
-| **Total Return (HPR)** | -11.47% | **-11.47%** | Relative $\pm 5.0\%$ |
-| **Annualized Return** | -4.04% | **-4.04%** | Relative $\pm 5.0\%$ |
-| **Maximum Drawdown** | -40.61% | **-40.61%** | Relative $\pm 5.0\%$ |
-| **Sharpe Ratio ($R_f=6\%$)** | 0.071 | **0.071** | Absolute $\pm 0.05$ |
-| **Win Rate** | 92.52% | **92.52%** | Relative $\pm 5.0\%$ |
-| **Total Closed Trades** | 962 | **962** | Exact Match ($0$) |
-| **Take-Profit Trades** | 890 | **890** | Exact Match ($0$) |
-
-### In-Sample Performance Analysis
-During the 2022 bear market, the grid generated **+262,036,062 VND** in gross oscillation profits across 890 take-profit fills. The catastrophic floor stop capped losses at -220,277,272 VND, allowing the fund to preserve capital and survive the -35% market drop with an overall portfolio loss of only -11.47%.
-
-> [!NOTE]
-> **Methodological Note on In-Sample Sharpe Ratio (30-Minute vs. Daily)**:
-> The metric `Sharpe Ratio: 0.071` reported in the Plutus verification manifest is calculated directly on high-frequency **30-minute bar percentage returns** ($\mu_{\text{30m}} = +0.0048\%$ per bar). Because 92.5% of completed trades were small positive take-profit harvests ($+1.60\%$), the bar-level arithmetic average is slightly positive and exceeds the per-bar risk-free rate ($0.06 / 2016 = 0.00298\%$). However, during the severe 2022 secular crash, 72 catastrophic floor stops produced large asymmetric downward gap shocks. Under geometric compounding, the high second-moment variance ($-\frac{1}{2}\sigma^2$, or volatility drag) pulled cumulative total return down to **-11.47%** (CAGR **-4.04%**).
-> 
-> When evaluated on standard institutional **Daily resampled returns**, the aggregated daily return correctly reflects this drag:
-> - **Daily Sharpe ($R_f = 6.0\%$)**: **-0.749**
-> - **Daily Sharpe ($R_f = 0.0\%$)**: **-0.273**
-> 
-> Both metrics are mathematically sound: 30-minute bar Sharpe measures local oscillation capture frequency, while Daily Sharpe captures multi-year portfolio capital preservation under tail-risk shocks.
+| Metric | Plutus Expected | Verified Result | Plutus Tolerance | Status |
+| :--- | :---: | :---: | :---: | :---: |
+| **Total Return (HPR)** | $+2.79\%$ | **$+2.79\%$** ($+27,922,585\text{ VND}$) | Relative $\pm 5.0\%$ | **PASS** |
+| **Annualized Return (CAGR)** | $+1.02\%$ | **$+1.02\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Maximum Drawdown (MDD)** | $-3.85\%$ | **$-3.85\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Daily Sharpe ($R_f=6\%$)** | $-1.510$ | **$-1.510$** | Absolute $\pm 0.15$ | **PASS** |
+| **Calmar Ratio** | $0.265$ | **$0.265$** | Absolute $\pm 0.05$ | **PASS** |
+| **VN30 Benchmark Return** | $-11.42\%$ | **$-11.42\%$** | — | **$+14.21\%$ Excess** |
+| **VN30 Benchmark MaxDD** | $-42.46\%$ | **$-42.46\%$** | — | **$11\times$ Capital Protection** |
+| **Market Beta ($\beta$)** | — | **$0.083$** | — | **Ultra-Low Beta** |
+| **Completed Trades** | $767$ | **$767$** ($514$ TP, $253$ Rotation) | Relative $\pm 5.0\%$ | **PASS** |
+| **Win Rate** | $67.0\%$ | **$67.0\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Emergency Floor Stops** | $0$ | **$0$ episodes ($0$ lots)** | Exact Match | **PASS** |
+| **Period-End Inventory** | $0\text{ VND}$ | **$0\text{ VND}$ ($100\%$ Cash)** | Exact Match | **PASS** |
 
 ![In-Sample Equity Curve](images/equity_curve_in_sample.png)
-
-*Figure 1: In-Sample Equity Curve (2021–2023) showing cash flow generation and downside containment during the 2022 market downturn.*
+*Figure 1: In-Sample Equity Curve (2021–2023) overlaid with normalized VN30 Benchmark equity line, demonstrating capital preservation during the 2022 crash.*
 
 ---
 
-## 5. Optimization
+## 5. Hyperparameter Optimization & Sensitivity Analysis
 
-Optimization was conducted to identify stable parameter regions and avoid overfitting.
+### Exhaustive 25-Point In-Sample Grid Search (`P-1`, `P-2`, `P-6`)
+To maintain time-series integrity, optimization was conducted **strictly on In-Sample data (2021–2023)** across all combinations of $N \in [14, 16, 18, 20, 22]$ and $\Delta \in [1.4\%, 1.6\%, 1.8\%, 2.0\%, 2.2\%]$. The objective function targeted the Calmar Ratio to prioritize drawdown containment over turnover.
 
 ```bash
-# Run Bayesian hyperparameter optimization
 python run_optimization.py
 ```
 
-### Search Space & Optimization Target
-- **Search Space**:
-  - Grid Levels: $N \in [14, 22]$
-  - Grid Spacing: $\Delta \in [1.4\%, 2.2\%]$
-- **Objective Function**: Maximize In-Sample Risk-Adjusted Return (Calmar Ratio / Sharpe Ratio).
-- **Seed**: 42.
+The full 25-point optimization surface is committed to [`results/optimization_grid_surface.csv`](file:///Users/ttt/Final_Projects_v1/strategies/minimalist_er_grid/results/optimization_grid_surface.csv).
 
-The global optimum identified and committed to [`config/config.yaml`](config/config.yaml) is:
+#### Full Surface: In-Sample Calmar Ratio Matrix
 
-```json
-{
-  "n_levels": 18,
-  "grid_spacing_pct": 0.016,
-  "selection_lookback": 40,
-  "selection_rebalance_days": 10
-}
-```
+| Levels ($N$) \ Spacing ($\Delta$) | 1.4% | 1.6% | 1.8% | 2.0% | 2.2% |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **$N = 14$** | $-0.247$ | $-0.096$ | $+0.025$ | $+0.125$ | $+0.239$ |
+| **$N = 16$** | $-0.182$ | $-0.046$ | $+0.030$ | $+0.138$ | **$+0.265$ (Global Optimum)** |
+| **$N = 18$** | $-0.194$ | $-0.035$ | $+0.031$ | $+0.143$ | $+0.263$ |
+| **$N = 20$** | $-0.147$ | $-0.058$ | $+0.008$ | $+0.110$ | $+0.229$ |
+| **$N = 22$** | $-0.171$ | $-0.090$ | $-0.023$ | $+0.071$ | $+0.182$ |
 
-### Empirical 2D Parameter Sensitivity Sweep (Lookback × Rebalance Window)
-To address questions regarding time frame selection (40-day lookback for ER vs. 10-day rebalancing), an exhaustive 16-combination parameter sweep was executed across $[20, 30, 40, 60]\text{ days}$ lookback and $[5, 10, 15, 20]\text{ days}$ rebalancing:
+#### Full Surface: In-Sample Daily Sharpe Ratio Matrix
+
+| Levels ($N$) \ Spacing ($\Delta$) | 1.4% | 1.6% | 1.8% | 2.0% | 2.2% |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **$N = 14$** | $-1.367$ | $-1.242$ | $-1.215$ | $-1.239$ | $-1.264$ |
+| **$N = 16$** | $-1.376$ | $-1.334$ | $-1.417$ | $-1.466$ | $-1.510$ |
+| **$N = 18$** | $-1.560$ | $-1.505$ | $-1.615$ | $-1.692$ | $-1.760$ |
+| **$N = 20$** | $-1.617$ | $-1.715$ | $-1.853$ | $-1.944$ | $-2.034$ |
+| **$N = 22$** | $-1.815$ | $-1.942$ | $-2.098$ | $-2.235$ | $-2.329$ |
+
+**Optimal Parameter Selection**: The global optimum **$N = 16$ levels, $\Delta = 2.2\%$** achieved Calmar Ratio $+0.265$, HPR $+2.79\%$, and Max Drawdown $-3.85\%$, committed to [`config/best_params.yaml`](file:///Users/ttt/Final_Projects_v1/strategies/minimalist_er_grid/config/best_params.yaml) and automatically loaded by all downstream runners.
+
+---
+
+### In-Sample Lookback $\times$ Rebalance Sensitivity Sweep (`P-1`)
+To examine sensitivity to selection timing, an exhaustive 16-combination sweep across lookback $\in [20, 30, 40, 60]\text{ days}$ and rebalance $\in [5, 10, 15, 20]\text{ days}$ was executed strictly on In-Sample data:
 
 ```bash
 python sweep_lookback_rebalance.py
 ```
 
-#### Holdout Max Drawdown Sensitivity Matrix (%)
+Saved to [`results/lookback_rebalance_surface.csv`](file:///Users/ttt/Final_Projects_v1/strategies/minimalist_er_grid/results/lookback_rebalance_surface.csv):
 
-| Lookback / Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
+#### In-Sample Total Return Matrix (%)
+
+| Lookback \ Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
 | :--- | :---: | :---: | :---: | :---: |
-| **20 Days** | -26.83% | -25.34% | -26.60% | -24.88% |
-| **30 Days** | -42.64% | -34.63% | -39.95% | -39.95% |
-| **40 Days** | **-13.55%** | **-6.88% (Optimum)** | **-13.92%** | -26.13% |
-| **60 Days** | -28.44% | -23.44% | -19.47% | -18.38% |
+| **20 Days** | $+2.63\%$ | $+0.34\%$ | $+7.86\%$ | $+4.59\%$ |
+| **30 Days** | $+5.93\%$ | $+6.83\%$ | $+7.85\%$ | $-6.33\%$ |
+| **40 Days** | $+4.03\%$ | $+0.44\%$ | $+2.61\%$ | $+3.82\%$ |
+| **60 Days** | $+1.31\%$ | $+1.10\%$ | $-1.24\%$ | $-9.15\%$ |
 
-#### Holdout Total Return Sensitivity Matrix (%)
+#### In-Sample Max Drawdown Matrix (%)
 
-| Lookback / Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
+| Lookback \ Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
 | :--- | :---: | :---: | :---: | :---: |
-| **20 Days** | +2.06% | +4.30% | +8.60% | +12.59% |
-| **30 Days** | -22.57% | -10.27% | +2.52% | +5.54% |
-| **40 Days** | +5.99% | **+7.29% (Optimum)** | +2.19% | -20.57% |
-| **60 Days** | +4.68% | +5.26% | +5.69% | +8.55% |
-
-**Key Finding**: The **(40-day Lookback, 10-day Rebalance)** configuration occupies an optimal stability plateau, delivering the **lowest Maximum Drawdown in Holdout across all 16 configurations (-6.88%)** while generating a **+7.29% Net Return** (Calmar ratio $> 1.05$). Short lookbacks ($\le 20$ days) suffer from high-frequency noise and elevated drawdown (-25.3%), while long rebalance windows ($\ge 20$ days) trap capital in decaying volatility regimes (-20.57% return).
+| **20 Days** | $-4.00\%$ | $-6.34\%$ | $-4.46\%$ | $-5.11\%$ |
+| **30 Days** | $-2.58\%$ | $-3.19\%$ | $-3.38\%$ | $-14.83\%$ |
+| **40 Days** | $-3.70\%$ | $-5.17\%$ | $-7.02\%$ | $-5.97\%$ |
+| **60 Days** | $-7.88\%$ | $-5.73\%$ | $-6.26\%$ | $-18.95\%$ |
 
 ---
 
-## 6. Backtesting on Out-of-Sample Historical Data
+## 6. Backtesting on Out-of-Sample Data (2024)
 
-- **Evaluation Window**: `2024-01-01` to `2024-12-31` (1 year, 67,428 bars).
-- **Macroeconomic Regime**: Range-bound consolidation and recovery.
+- **Window**: `2024-01-01` to `2024-12-31` (1.0 year, 67,428 bars).
+- **Parameters**: Piped from `config/best_params.yaml` ($N=16, \Delta=2.2\%$) with 40-day warm-up.
 
 ```bash
 python run_oos.py
 ```
 
-### Out-of-Sample Verified Performance Metrics
+### Out-of-Sample Verified Performance
 
-| Metric | Target Value | Baseline Result | Plutus Verification Tolerance |
-| :--- | :---: | :---: | :---: |
-| **Total Return (HPR)** | +8.90% | **+8.90% (+89,026,819 VND)** | Relative $\pm 5.0\%$ |
-| **Annualized Return** | +8.93% | **+8.93%** | Relative $\pm 5.0\%$ |
-| **Maximum Drawdown** | -3.30% | **-3.30%** | Relative $\pm 5.0\%$ |
-| **Sharpe Ratio ($R_f=6\%$)** | 0.334 | **0.334** | Absolute $\pm 0.05$ |
-| **Win Rate** | 100.0% | **100.0% (Zero Stops)** | Absolute $\pm 0.01$ |
-| **Total Closed Trades** | 250 | **250** | Exact Match ($0$) |
-| **Take-Profit Trades** | 250 | **250** | Exact Match ($0$) |
-
-### Out-of-Sample Performance Analysis
-During the 2024 out-of-sample period, the strategy achieved a **100.0% Win Rate** across 250 closed trades. The 18-level grid captured regular oscillation profits without triggering a single catastrophic floor stop, resulting in a maximum drawdown of only **-3.30%** and an annualized Sharpe ratio of 0.334.
+| Metric | Plutus Expected | Verified Result | Plutus Tolerance | Status |
+| :--- | :---: | :---: | :---: | :---: |
+| **Total Return (HPR)** | $+5.59\%$ | **$+5.59\%$** ($+55,885,787\text{ VND}$) | Relative $\pm 5.0\%$ | **PASS** |
+| **Annualized Return (CAGR)** | $+5.60\%$ | **$+5.60\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Maximum Drawdown (MDD)** | $-0.91\%$ | **$-0.91\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Daily Sharpe ($R_f=6\%$)** | $-0.247$ | **$-0.247$** | Absolute $\pm 0.15$ | **PASS** |
+| **Calmar Ratio** | $6.153$ | **$6.153$** | Relative $\pm 5.0\%$ | **PASS** |
+| **VN30 Benchmark Return** | $+18.83\%$ | **$+18.83\%$** | — | — |
+| **Market Beta ($\beta$)** | — | **$0.045$** | — | **Market Neutral** |
+| **Completed Trades** | $200$ | **$200$** ($149$ TP, $51$ Rotation) | Relative $\pm 5.0\%$ | **PASS** |
+| **Win Rate** | $74.5\%$ | **$74.5\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Emergency Floor Stops** | $0$ | **$0$ episodes ($0$ lots)** | Exact Match | **PASS** |
+| **Period-End Inventory** | — | **POW: $3,000$ shs ($29.76\text{M VND}$, unrealized $-176\text{k}$)** | — | Marked to Market |
 
 ![Out-of-Sample Equity Curve](images/equity_curve_out_sample.png)
-
-*Figure 2: Out-of-Sample Equity Curve (2024) demonstrating steady, low-volatility capital appreciation.*
+*Figure 2: Out-of-Sample Equity Curve (2024) showing stable equity growth with near-zero drawdown ($-0.91\%$).*
 
 ---
 
-## 7. Paper Trading & Forward Holdout Evaluation
+## 7. 2025 Bull Regime Evaluation (`P-3`)
 
-- **Evaluation Window**: `2026-01-05` to `2026-09-18` (8.5 months / 174 trading days / 256.2 calendar days, 46,203 bars). The year 2025 served as an unobserved embargo gap year.
-- **Macroeconomic Regime**: Blind forward evaluation under choppy market conditions (-3.44% VN30 index drift).
+- **Window**: `2025-01-01` to `2025-12-31` (1.0 year, 66,244 bars).
+- **Macroeconomic Regime**: Strong liquidity bull market. The VN30 index surged by **$+51.18\%$** with a $-16.22\%$ intra-year correction.
+
+```bash
+python run_2025.py
+```
+
+### 2025 Bull Regime Verified Performance
+
+| Metric | Verified Value | Macro Context |
+| :--- | :---: | :---: |
+| **Holding Period Return (HPR)** | **$+8.57\%$** ($+85,725,956\text{ VND}$) | Consistent absolute cash harvest |
+| **Annualized Return (CAGR)** | **$+8.62\%$** | Exceeds risk-free rate ($6.0\%$) |
+| **Maximum Drawdown (MDD)** | **$-3.38\%$** | $5\times$ lower than VN30 ($-16.22\%$) |
+| **Daily Sharpe ($R_f=6\%$)** | **$+0.543$** | Positive risk-adjusted excess return |
+| **Calmar Ratio** | **$2.549$** | High drawdown efficiency |
+| **VN30 Benchmark Return** | **$+51.18\%$** | Parabolic trend market |
+| **Market Beta ($\beta$)** | **$0.125$** | Low systematic equity correlation |
+| **Completed Trades** | **$329$** ($262$ TP, $67$ Rotation) | $79.6\%$ Win Rate |
+| **Period-End Open Inventory** | **GVR: $2,100$ shs ($55.02\text{M VND}$)** | Unrealized $-1.31\text{M VND}$ |
+
+### Empirical Insights on Grid Mechanics in Bull Markets
+During a directional bull regime, spot grid trading intentionally underperforms pure long equity buy-and-hold because:
+1. Long tranches are progressively liquidated into take-profit targets as prices rise, converting stock equity into risk-free cash.
+2. The portfolio holds an average cash reserve of $60\% - 85\%$, damping volatility and keeping market beta low ($\beta = 0.125$).
+3. In exchange for conceding market beta in parabolic runs, the strategy limits drawdowns to $-3.38\%$ (compared to $-16.22\%$ for the index).
+
+![2025 Bull Regime Equity Curve](images/equity_curve_2025.png)
+*Figure 3: 2025 Bull Regime Equity Curve showing steady oscillation harvesting without directional exposure.*
+
+---
+
+## 8. Paper Trading & Forward Holdout Evaluation (2026)
+
+- **Window**: `2026-01-01` to `2026-09-18` (8.5 months / 174 trading sessions / 256 calendar days, 46,203 bars).
+- **Macroeconomic Regime**: Choppy market with downward drift. The VN30 index fell by **$-3.18\%$** with a **$-16.96\%$** maximum drawdown.
 
 ```bash
 python run_holdout.py
 ```
 
-### Forward Holdout Verified Performance Metrics
+### Forward Holdout Verified Performance
 
-| Metric | Target Value | Baseline Result | Plutus Verification Tolerance |
-| :--- | :---: | :---: | :---: |
-| **Total Return (HPR)** | +7.29% | **+7.29% (+72,862,928 VND)** | Relative $\pm 5.0\%$ |
-| **Annualized Return** | +10.55% | **+10.55%** | Relative $\pm 5.0\%$ |
-| **Maximum Drawdown** | -6.88% | **-6.88%** | Relative $\pm 5.0\%$ |
-| **Sharpe Ratio ($R_f=6\%$)** | 0.254 | **0.254** | Absolute $\pm 0.05$ |
-| **Win Rate** | 100.0% | **100.0% (Zero Stops)** | Absolute $\pm 0.01$ |
-| **Total Closed Trades** | 288 | **288** | Exact Match ($0$) |
-| **Take-Profit Trades** | 288 | **288** | Exact Match ($0$) |
+| Metric | Plutus Expected | Verified Result | Plutus Tolerance | Status |
+| :--- | :---: | :---: | :---: | :---: |
+| **Total Return (HPR)** | $+5.37\%$ | **$+5.37\%$** ($+53,661,064\text{ VND}$) | Relative $\pm 5.0\%$ | **PASS** |
+| **Annualized Return (CAGR)** | $+7.74\%$ | **$+7.74\%$** (Annualized rate over 256 days) | Relative $\pm 5.0\%$ | **PASS** |
+| **Maximum Drawdown (MDD)** | $-2.13\%$ | **$-2.13\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Daily Sharpe ($R_f=6\%$)** | $+0.431$ | **$+0.431$** | Absolute $\pm 0.15$ | **PASS** |
+| **Calmar Ratio** | $3.639$ | **$3.639$** | Relative $\pm 5.0\%$ | **PASS** |
+| **VN30 Benchmark Return** | $-3.18\%$ | **$-3.18\%$** | — | **$+8.55\%$ Alpha Excess** |
+| **VN30 Benchmark MaxDD** | $-16.96\%$ | **$-16.96\%$** | — | **$8\times$ Drawdown Reduction** |
+| **Market Beta ($\beta$)** | — | **$0.094$** | — | **Market Neutral** |
+| **Completed Trades** | $248$ | **$248$** ($192$ TP, $56$ Rotation) | Relative $\pm 5.0\%$ | **PASS** |
+| **Win Rate** | $77.4\%$ | **$77.4\%$** | Relative $\pm 5.0\%$ | **PASS** |
+| **Emergency Floor Stops** | $0$ | **$0$ episodes ($0$ lots)** | Exact Match | **PASS** |
+| **Period-End Inventory** | — | **GVR: $400$, TCB: $400$, VHM: $400$ ($53.8\text{M}$)** | — | Unrealized $+554\text{k VND}$ |
 
 > [!NOTE]
-> **Why Annualized Return (CAGR: +10.55%) is Higher than Total Return (HPR: +7.29%)**:
-> By standard financial compounding definition, Annualized Return scales returns to a 12-month (365.25-day) annual basis:
+> **Mathematical Clarification on Annualized Return (CAGR: $+7.74\%$) vs. Total Return (HPR: $+5.37\%$)**:
+> Annualized return normalizes returns to a standard 365.25-day annual basis:
 > 
-> $$
-> \text{CAGR} = (1 + \text{HPR})^{\frac{365.25}{\text{Days}}} - 1
-> $$
+> $$\text{CAGR} = (1 + \text{HPR})^{\frac{365.25}{\text{Days}}} - 1$$
 > 
-> Because the Forward Holdout evaluation window spans **256.2 calendar days (0.7015 years < 1.0 year)**, the compounding exponent is greater than one: $\frac{365.25}{256.2} \approx 1.4255$.
-> Generating **+7.29% in only 8.5 months** scales up to an annualized compounding rate of:
-> 
-> $$
-> \text{CAGR} = (1 + 0.0729)^{1.4255} - 1 = \mathbf{+10.55\%}
-> $$
-> 
-> For periods longer than 1 year (e.g. In-Sample: 2.95 years), CAGR is lower than HPR ($-4.04\% > -11.47\%$). For periods shorter than 1 year (e.g. Holdout: 8.5 months), CAGR is higher than HPR.
+> Because the Forward Holdout spans **256.0 calendar days (0.701 years)**, the compounding factor is $\frac{365.25}{256.0} \approx 1.4267$. Generating $+5.37\%$ in 8.5 months yields an annualized rate of $(1 + 0.0537)^{1.4267} - 1 = \mathbf{+7.74\%}$.
 
 ![Forward Holdout Equity Curve](images/equity_curve_holdout.png)
-
-*Figure 3: Forward Blind Holdout Equity Curve (January–September 2026) demonstrating steady alpha generation while the benchmark market trended down.*
+*Figure 4: Forward Holdout Equity Curve (2026) showing steady alpha generation while the benchmark market trended down with $-16.96\%$ drawdown.*
 
 ---
 
-## Advanced Research & Empirical Studies
+## 9. Advanced Research & Empirical Studies
 
-### 1. Visualizing the Grid Over Price Candlesticks
-To verify how geometric limit orders execute against price action, the visualization below displays an active grid cycle on **HDB (HDBank)** during the 2024 Out-of-Sample period:
+### 1. Visualizing the Grid Over Candlestick Price Action
+To verify limit order execution against actual HOSE 30-minute bar prints, [`visualize_price_grid_overlay.py`](file:///Users/ttt/Final_Projects_v1/strategies/minimalist_er_grid/visualize_price_grid_overlay.py) generates a candlestick overlay:
 
 ```bash
 python visualize_price_grid_overlay.py
 ```
 
-![Grid Price Overlay Demonstration](images/grid_price_overlay_demonstration.png)
+![Grid Price Overlay](images/grid_price_overlay_demonstration.png)
+*Figure 5: High-resolution candlestick grid overlay showing 50-SMA anchor, geometric buy limit orders, take-profit executions, and rotation liquidations.*
 
-*Figure 4: Active grid matrix on HDB showing 50-SMA anchor (blue line), geometric buy levels $L_1 \dots L_{10}$ (green dashed lines), take-profit targets (teal dashed lines), and inventory liquidation upon technical rebound.*
-
-### 2. Empirical Validation of Kaufman ER: Oscillation Roundtrips vs. Trend
-To test whether Low ER stocks genuinely oscillate more frequently than High ER stocks under identical grid spacing, we analyzed roundtrip completion frequency across all VN30 constituents:
+### 2. Empirical Validation of Kaufman ER: Oscillation vs. Trend
+To verify that Low ER stocks complete more profitable roundtrips than High ER stocks under identical grid spacing, [`analyze_er_roundtrips.py`](file:///Users/ttt/Final_Projects_v1/strategies/minimalist_er_grid/analyze_er_roundtrips.py) compares roundtrip completion rates across VN30 constituents:
 
 ```bash
 python analyze_er_roundtrips.py
 ```
 
 ![ER Roundtrip Comparison](images/er_roundtrip_comparison.png)
+*Figure 6: Empirical proof that Low ER stocks execute significantly more take-profit roundtrips with lower inventory accumulation than High ER stocks.*
 
-*Figure 5: Roundtrip frequency comparison proving Low ER stocks complete significantly more oscillations per unit time with lower inventory drag.*
+---
 
-### 3. Dynamic Inventory-Proportional VN30F Derivative Short Hedge & Capital Scaling
-To address structural downside exposure during severe bear markets, we evaluated an automated VN30F derivative short hedge scaled to physical inventory across three portfolio sizes: **500M VND, 1B VND, and 5B VND**:
+## Reproduction & Step-by-Step Execution Guide
 
+### 1. Environment Setup
 ```bash
-python run_inventory_hedge_scale_study.py
+git clone https://github.com/Tathao1t1/Minimalist_ER_Grid.git
+cd Minimalist_ER_Grid
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-![Inventory Hedge Scale Comparison](images/inventory_hedge_scale_comparison.png)
-
-*Figure 6: Capital scaling evaluation showing the inventory short hedge successfully compresses maximum drawdown during down-legs across all fund sizes.*
-
-### 4. Signal Role Diagnosis: Alpha Addition vs. Filter Gating
-To address the question: *"Does secondary indicator information provide directional alpha or act as an entry gate?"*, we evaluated four signal integration topologies:
-1. **$A$ alone (Unfiltered Grid Baseline)**
-2. **$B$ alone (Directional Trend Signal)**
-3. **$A + B$ (Alpha Addition / Voting Ensemble)**
-4. **$A \times \text{Filter}(B)$ (Gated Strategy - Proposed System)**
+### 2. Running Individual Steps
+Each pipeline step is executable standalone:
 
 ```bash
-python run_signal_role_diagnosis.py
+# Step 2: Data preparation and checksum validation
+python run_data_prep.py
+
+# Step 4: In-Sample evaluation (2021-2023)
+python run_is.py
+
+# Step 5: Exhaustive 25-point In-Sample grid optimization
+python run_optimization.py
+
+# Step 6: Out-of-Sample evaluation (2024)
+python run_oos.py
+
+# Step 7a: 2025 Bull Regime evaluation
+python run_2025.py
+
+# Step 7b: Forward Holdout evaluation (2026)
+python run_holdout.py
+
+# Sensitivity sweep (strictly on In-Sample)
+python sweep_lookback_rebalance.py
 ```
 
-![Signal Role Diagnosis](images/signal_role_diagnosis.png)
-
-*Figure 7: Signal topology diagnosis showing directional trend signals exhibit negative standalone expectancy on HOSE, while pure filter gating improves return and cuts drawdown.*
-
-### 5. Multi-Cohort Benchmark Ablation Study
-We benchmarked the strategy against counter-hypotheses across all data splits:
-- **Low ER (Proposed Strategy)**: Bottom 4 ER stocks + 50-SMA proximity gate.
-- **High ER (Counter-Hypothesis)**: Top 4 ER stocks (trending stocks) + 50-SMA proximity gate.
-- **Random Selection (Baseline)**: 4 stocks chosen at random every 10 days.
-- **Low ER without SMA Filter**: Low ER stocks without the fair-value anchor proximity check.
+### 3. Containerized Verification via Plutus
+Reproduce the pipeline inside an isolated container with `plutus-verify`:
 
 ```bash
-python run_benchmark_ablation.py
+plutus-verify check .
 ```
-
-![Benchmark Ablation Comparison](images/benchmark_ablation_comparison.png)
-
-*Figure 8: Benchmark ablation comparison confirming Low ER combined with the SMA proximity gate delivers superior risk-adjusted returns.*
 
 ---
 
@@ -450,32 +439,32 @@ python run_benchmark_ablation.py
 
 ```text
 strategies/minimalist_er_grid/
-├── README.md                           # Plutus-compliant quantitative documentation
-├── config.json                         # Strategy specification & exact performance metrics
-├── requirements.txt                    # Pinned Python package dependencies
+├── README.md                           # Comprehensive quantitative research documentation
+├── requirements.txt                    # Pinned package dependencies
 ├── .plutus/
 │   ├── manifest.yaml                   # PLUTUS reproducibility manifest (v2.0)
 │   └── expected/                       # Baseline verified metrics and visual artifacts
 ├── config/
-│   └── config.yaml                     # Strategy parameters & configuration
+│   ├── config.yaml                     # Strategy base configuration
+│   └── best_params.yaml                # Optimal parameters (N=16, spacing=0.022) piped from IS grid search
 ├── src/
-│   ├── logic.py                        # Spot grid backtesting engine with pessimistic fill rules
-│   ├── data_fetcher.py                 # HOSE data loader, normalizer, and universe builder
-│   ├── optimizer.py                    # Bayesian Optuna hyperparameter optimization engine
-│   └── driver.py                       # Unified command-line interface
-├── run_data_prep.py                    # Step 2: Data preparation and checksum verification
+│   ├── logic.py                        # Execution engine with T+2 settlement, 50 bps fees, and rotation rules
+│   ├── data_fetcher.py                 # Multi-split loader with 40-day indicator pre-split warm-up
+│   └── optimizer.py                    # Exhaustive 25-point In-Sample grid search engine
+├── run_data_prep.py                    # Step 2: Data preparation & split checksum verification
 ├── run_is.py                           # Step 4: In-Sample evaluation runner (2021–2023)
-├── run_optimization.py                 # Step 5: Parameter optimization runner
+├── run_optimization.py                 # Step 5: Parameter optimization runner (In-Sample grid)
 ├── run_oos.py                          # Step 6: Out-of-Sample evaluation runner (2024)
-├── run_holdout.py                      # Step 7: Forward blind holdout runner (2025–2026)
-├── sweep_lookback_rebalance.py         # 2D Lookback x Rebalance sensitivity sweep
-├── run_benchmark_ablation.py           # 4-cohort benchmark ablation study
-├── run_inventory_hedge_scale_study.py  # VN30F dynamic inventory short hedge scale study
-├── run_signal_role_diagnosis.py        # Alpha addition vs. Filter gating diagnostic
+├── run_2025.py                         # Step 7a: 2025 Bull Regime evaluation runner
+├── run_holdout.py                      # Step 7b: Forward blind holdout runner (2026)
+├── sweep_lookback_rebalance.py         # 16-combination lookback x rebalance sensitivity sweep on In-Sample
 ├── analyze_er_roundtrips.py            # ER oscillation roundtrip frequency analysis
-├── visualize_price_grid_overlay.py     # High-resolution candlestick grid overlay generator
-├── images/                             # Verified high-resolution performance artifacts
-└── data/                               # Bundled parquet datasets (IS, OOS, Holdout, Benchmark)
+├── visualize_price_grid_overlay.py     # Candlestick grid overlay generator
+├── results/
+│   ├── optimization_grid_surface.csv   # Committed 25-point optimization surface
+│   └── lookback_rebalance_surface.csv  # Committed 16-point sensitivity surface
+├── images/                             # Verified dual-panel equity curves with benchmark overlay
+└── data/                               # Parquet datasets (IS, OOS, 2025, Holdout, Benchmark, Adjustments)
 ```
 
 ---
@@ -483,6 +472,6 @@ strategies/minimalist_er_grid/
 ## References
 
 1. **Perry J. Kaufman (2013)**. *Trading Systems and Methods*, 5th Edition. John Wiley & Sons.
-2. **State Securities Commission of Vietnam (SSC)**. *Circular No. 120/2020/TT-BTC on Trading Regulations for Listed Securities*. Ministry of Finance of Vietnam.
+2. **State Securities Commission of Vietnam (SSC)**. *Circular No. 120/2020/TT-BTC on Trading Regulations for Listed Securities on HOSE*. Ministry of Finance of Vietnam.
 3. **Algotrade Plutus Quantitative Standard (2025)**. *Guidelines for Reproducible Quantitative Research and The 9-Step Strategy Development Lifecycle*.
 4. **Algotrade Education (2025)**. *Dynamic Grid Trading Algorithm - Project of Group 5 - CS408 - APCS, HCMUS*. GitHub: [algotrade-education/DynamicGrid](https://github.com/algotrade-education/DynamicGrid).
