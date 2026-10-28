@@ -15,3 +15,5 @@ optuna_trials.txt
 .plutus/cache/
 .plutus/build/
 .plutus/Dockerfile.generated
+scratch/
+

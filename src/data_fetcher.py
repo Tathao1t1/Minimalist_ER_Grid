@@ -8,8 +8,15 @@ def prepare_data(config, split="in_sample"):
     data_cfg = config.get("data", {})
     strat_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    file_key = f"{split}_file"
+    split_map = {
+        "out_of_sample": "out_sample",
+        "forward_holdout": "holdout"
+    }
+    split_norm = split_map.get(split, split)
+    file_key = f"{split_norm}_file"
     raw_path = data_cfg.get(file_key, "")
+    if not raw_path:
+        raise ValueError(f"No file path configured for split '{split}' (key '{file_key}')")
     if not os.path.isabs(raw_path):
         spot_path = os.path.join(strat_dir, raw_path)
     else:

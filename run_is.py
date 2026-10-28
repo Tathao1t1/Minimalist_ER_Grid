@@ -58,8 +58,10 @@ def main():
     print(f"Daily Sharpe:       {res['daily_sharpe']:.3f} (30m Sharpe: {res['sharpe_ratio']:.3f})")
     print(f"Calmar Ratio:       {res['calmar_ratio']:.3f}")
     print(f"Spot Harvest PnL:   {res['spot_harvest_pnl']:+,.0f} VND (TP Trades: {res['tp_trades']})")
-    print(f"Spot Drag PnL:      {res['spot_drag_pnl']:+,.0f} VND (Floor Stops: {res['drag_trades']})")
+    print(f"Rotation PnL:       {res['rotation_pnl']:+,.0f} VND (Rotations: {res['rot_trades']})")
+    print(f"Floor Stop PnL:     {res['floor_stop_pnl']:+,.0f} VND (Floor Stops: {res['stop_trades']})")
     print(f"Total Trades:       {res['total_trades']} (Win Rate: {res['win_rate']:.1f}%)")
+    print(f"Period-End Inventory:{res['open_inventory_value']:+,.0f} VND (Unrealized: {res['unrealized_pnl']:+,.0f} VND)")
     print("=" * 70)
 
     with pv.step("in_sample") as r:

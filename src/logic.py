@@ -17,19 +17,25 @@ def kaufman_er(prices: np.ndarray) -> float:
     volatility = float(np.sum(np.abs(np.diff(prices))))
     return direction / volatility if volatility > 0 else 1.0
 
-def get_settlement_dt(trade_dt: datetime) -> datetime:
+def get_settlement_dt(trade_dt: datetime, trading_days=None) -> datetime:
     """
     HOSE T+2.5 Settlement Availability Rule:
     Shares purchased on day T become eligible for sale at 13:00 PM on T+2.
-    Skips non-trading weekend days.
+    Skips non-trading days (weekends and official Vietnamese holidays via trading calendar).
     """
-    d = trade_dt.date()
-    added = 0
-    while added < 2:
-        d += timedelta(days=1)
-        if d.weekday() < 5:
-            added += 1
-    return datetime.combine(d, datetime.strptime("13:00", "%H:%M").time())
+    if trading_days is not None:
+        d = trade_dt.date()
+        idx = np.searchsorted(trading_days, d)
+        s_idx = min(idx + 2, len(trading_days) - 1)
+        return datetime.combine(trading_days[s_idx], datetime.strptime("13:00", "%H:%M").time())
+    else:
+        d = trade_dt.date()
+        added = 0
+        while added < 2:
+            d += timedelta(days=1)
+            if d.weekday() < 5:
+                added += 1
+        return datetime.combine(d, datetime.strptime("13:00", "%H:%M").time())
 
 def build_zero_overlap_whitelist(
     bars_df,
@@ -38,23 +44,31 @@ def build_zero_overlap_whitelist(
     top_k=4,
     trend_filter="none",
     selection_mode="er_low",
-    seed=42
+    seed=42,
+    use_sma_filter=True
 ):
     """
     Point-in-Time constituent selection based on Kaufman Efficiency Ratio (ER).
     Evaluates rolling historical window [t - lookback_days, t] with zero forward leakage.
-    Supports selection_mode:
-      - 'er_low': Top-K lowest ER (mean-reverting, oscillating - core strategy)
-      - 'er_high': Top-K highest ER (trending, momentum - counter-hypothesis)
-      - 'random': Top-K randomly sampled constituents (benchmark control group)
+    Implements README §3 Rule 1:
+      1. Evaluates 40-day rolling ER.
+      2. Filters for stocks within ±3% of 50-bar SMA fair-value anchor.
+      3. Ranks qualifying equities by ER and selects top-K constituents.
     """
     daily_records = []
+    ticker_history = {}
     for ticker, df in bars_df.groupby("tickersymbol"):
         df = df.sort_values("bar_close").copy()
         if df["close"].max() < 1000:
             for c in ["open", "high", "low", "close"]:
                 df[c] *= 1000.0
         df["date"] = df["bar_close"].dt.date
+        df["sma50"] = df["close"].rolling(50).mean()
+        ticker_history[ticker] = {
+            "dates": df["date"].values,
+            "close": df["close"].values,
+            "sma50": df["sma50"].values
+        }
         daily = df.groupby("date").agg({
             "open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"
         }).reset_index()
@@ -76,26 +90,53 @@ def build_zero_overlap_whitelist(
             if len(c_hist) < lookback_days * 0.8:
                 continue
             er_val = kaufman_er(c_hist.values)
-            candidates.append((ticker, er_val))
+            
+            sma_pass = True
+            if use_sma_filter:
+                th = ticker_history.get(ticker)
+                if th is not None:
+                    mask_idx = np.searchsorted(th["dates"], rebal_date, side="right") - 1
+                    if mask_idx >= 50:
+                        last_c = th["close"][mask_idx]
+                        sma_v = th["sma50"][mask_idx]
+                        if not np.isnan(sma_v) and sma_v > 0:
+                            sma_pass = (abs(last_c - sma_v) / sma_v <= 0.03)
+                        else:
+                            sma_pass = False
+                    else:
+                        sma_pass = False
+                else:
+                    sma_pass = False
+                    
+            candidates.append((ticker, er_val, sma_pass))
+            
+        if use_sma_filter:
+            qual = [c for c in candidates if c[2]]
+            if len(qual) >= top_k:
+                qual_pool = qual
+            else:
+                rem = [c for c in candidates if not c[2]]
+                rem.sort(key=lambda x: x[1])
+                qual_pool = qual + rem[:(top_k - len(qual))]
+        else:
+            qual_pool = candidates
             
         if selection_mode == "er_low":
-            # Select lowest ER (most mean-reverting oscillating stocks)
-            candidates.sort(key=lambda x: x[1])
-            whitelist[rebal_date] = [c[0] for c in candidates[:top_k]]
+            qual_pool.sort(key=lambda x: x[1])
+            whitelist[rebal_date] = [c[0] for c in qual_pool[:top_k]]
         elif selection_mode == "er_high":
-            # Select highest ER (trending stocks)
-            candidates.sort(key=lambda x: x[1], reverse=True)
-            whitelist[rebal_date] = [c[0] for c in candidates[:top_k]]
+            qual_pool.sort(key=lambda x: x[1], reverse=True)
+            whitelist[rebal_date] = [c[0] for c in qual_pool[:top_k]]
         elif selection_mode == "random":
-            valid_tickers = [c[0] for c in candidates]
+            valid_tickers = [c[0] for c in qual_pool]
             if len(valid_tickers) >= top_k:
                 chosen = rng.choice(valid_tickers, size=top_k, replace=False).tolist()
             else:
                 chosen = valid_tickers
             whitelist[rebal_date] = chosen
         else:
-            candidates.sort(key=lambda x: x[1])
-            whitelist[rebal_date] = [c[0] for c in candidates[:top_k]]
+            qual_pool.sort(key=lambda x: x[1])
+            whitelist[rebal_date] = [c[0] for c in qual_pool[:top_k]]
         
     return whitelist
 
@@ -152,7 +193,10 @@ class MinimalistERGridBacktest:
                 bars_df[c] *= 1000.0
         bars_df = bars_df.sort_values(["bar_close", "tickersymbol"]).reset_index(drop=True)
         
-        # 1. Build Whitelist
+        # Precompute trading days array for institutional settlement calendar (A-12)
+        trading_days = np.array(sorted(bars_df["bar_close"].dt.date.unique()))
+        
+        # 1. Build Whitelist with Rule 1: SMA proximity filter first, then ER ranking (A-8)
         whitelist_by_date = build_zero_overlap_whitelist(
             bars_df,
             lookback_days=self.selection_lookback,
@@ -160,7 +204,8 @@ class MinimalistERGridBacktest:
             top_k=self.top_k,
             trend_filter=self.trend_filter,
             selection_mode=self.selection_mode,
-            seed=self.seed
+            seed=self.seed,
+            use_sma_filter=self.use_sma_filter
         )
         
         # 2. Compute 50-period SMA anchor per ticker
@@ -233,9 +278,18 @@ class MinimalistERGridBacktest:
                         to_remove.append((lvl, pos["tp_price"], False, "target"))
                         continue
 
-                    # 4. Rotation Exit (requires settlement)
-                    if ticker not in cur_wl and can_exit and (grid_info is None):
-                        to_remove.append((lvl, bar_c, True, "rotation_exit"))
+                    # 4. Rotation Exit (requires settlement, A-7)
+                    if ticker not in cur_wl:
+                        if pos.get("pending_rotation_exit", False):
+                            if can_exit:
+                                fill = bar_o
+                                to_remove.append((lvl, fill, True, "settled_rotation_exit"))
+                            continue
+                        if can_exit:
+                            fill = bar_c
+                            to_remove.append((lvl, fill, True, "rotation_exit"))
+                        else:
+                            pos["pending_rotation_exit"] = True
                         continue
                         
                 for (lvl, fill_px, is_stop, reason) in to_remove:
@@ -279,8 +333,6 @@ class MinimalistERGridBacktest:
                     sma_val = anchors[ticker].get(ts, np.nan)
                     if np.isnan(sma_val):
                         continue
-                    if self.use_sma_filter and (abs(float(bar["close"]) - sma_val) / sma_val > 0.03):
-                        continue
                     spacing = sma_val * self.grid_spacing_pct
                     levels = [round(sma_val - k * spacing, 2) for k in range(1, self.n_levels + 1)]
                     tps = [round(sma_val - (k - 1) * spacing, 2) for k in range(1, self.n_levels + 1)]
@@ -301,7 +353,10 @@ class MinimalistERGridBacktest:
             for ticker, g in list(grids.items()):
                 if ticker not in bar_group.index:
                     continue
-                # Block new buys if floor stop was triggered
+                # Rotation discipline: Never place/execute buys on off-whitelist tickers (A-7)
+                if ticker not in cur_wl:
+                    continue
+                # Block new buys if floor stop was triggered (A-10)
                 if g.get("stop_triggered", False):
                     continue
                 # Order placement lag: Newly deployed grid at close of ts only active from bar t+1
@@ -318,11 +373,12 @@ class MinimalistERGridBacktest:
                     if bar_l > buy_px:
                         continue
                         
-                    # Pessimistic Gap Fill: if bar opened below buy limit, fill at Open
+                    # Favorable Gap Fill at open (A-14)
                     fill_base = bar_o if bar_o <= buy_px else buy_px
                     actual_fill = fill_base * (1.0 + self.slippage)
                     
-                    order_shares = max(100, int(round(capital_per_level / actual_fill / 100.0)) * 100)
+                    # Tranche sizing strictly adhering to floor formula (A-13)
+                    order_shares = max(100, int(np.floor(capital_per_level / actual_fill / 100.0)) * 100)
                     entry_cost = actual_fill * order_shares * self.broker_fee
                     total_cost = actual_fill * order_shares + entry_cost
                     if cash < total_cost:
@@ -334,8 +390,9 @@ class MinimalistERGridBacktest:
                         "tp_price": g["tps"][lvl_idx - 1],
                         "entry_cost": entry_cost,
                         "entry_ts": ts,
-                        "settlement": get_settlement_dt(ts),
-                        "pending_floor_stop": False
+                        "settlement": get_settlement_dt(ts, trading_days),
+                        "pending_floor_stop": False,
+                        "pending_rotation_exit": False
                     }
                     
             pos_val = 0.0
@@ -382,7 +439,7 @@ class MinimalistERGridBacktest:
             longest_dd_days = int(round(max_days))
             
         rets = eq_series.pct_change().dropna()
-        bars_per_year = 252.0 * 9.0  # 9 30-minute bars per day on HOSE
+        bars_per_year = 252.0 * 9.0  # 9 30-minute bars per day on HOSE (A-5)
         rf_per_bar = self.risk_free_rate / bars_per_year
         excess_mean = float(rets.mean() - rf_per_bar)
         sharpe = float(excess_mean / rets.std() * np.sqrt(bars_per_year)) if rets.std() > 0 else 0.0
@@ -396,14 +453,29 @@ class MinimalistERGridBacktest:
         daily_excess = daily_rets.mean() - rf_daily
         daily_sharpe = float(daily_excess / daily_rets.std() * np.sqrt(252)) if (len(daily_rets) > 0 and daily_rets.std() > 0) else 0.0
         
-        calmar = (cagr / abs(max_dd)) if max_dd != 0 else 0.0  # Preserves sign for losses
+        calmar = (cagr / abs(max_dd)) if max_dd != 0 else 0.0  # Preserves sign for losses (A-15)
         
         tp_trades = self.trades_df[self.trades_df["reason"] == "target"] if len(self.trades_df) > 0 else pd.DataFrame()
-        drag_trades = self.trades_df[self.trades_df["reason"] != "target"] if len(self.trades_df) > 0 else pd.DataFrame()
+        rot_trades = self.trades_df[self.trades_df["reason"].str.contains("rotation")] if len(self.trades_df) > 0 else pd.DataFrame()
+        stop_trades = self.trades_df[self.trades_df["reason"].str.contains("floor_stop")] if len(self.trades_df) > 0 else pd.DataFrame()
         
         tp_pnl = float(tp_trades["pnl"].sum()) if len(tp_trades) > 0 else 0.0
-        drag_pnl = float(drag_trades["pnl"].sum()) if len(drag_trades) > 0 else 0.0
+        rot_pnl = float(rot_trades["pnl"].sum()) if len(rot_trades) > 0 else 0.0
+        stop_pnl = float(stop_trades["pnl"].sum()) if len(stop_trades) > 0 else 0.0
         win_rate = (len(tp_trades) / len(self.trades_df) * 100.0) if len(self.trades_df) > 0 else 0.0
+        
+        # Period-end open inventory mark-to-market (A-4)
+        open_shares_count = 0
+        open_cost_basis = 0.0
+        for t, l_dict in positions.items():
+            for p in l_dict.values():
+                open_shares_count += p["shares"]
+                open_cost_basis += p["entry_price"] * p["shares"] + p["entry_cost"]
+        open_market_val = sum(
+            sum(p["shares"] for p in l_dict.values()) * (float(last_known_close.get(t, 0.0)))
+            for t, l_dict in positions.items()
+        )
+        unrealized_pnl = open_market_val - open_cost_basis
         
         return {
             "initial_capital": self.capital,
@@ -419,10 +491,14 @@ class MinimalistERGridBacktest:
             "calmar_ratio": calmar,
             "total_trades": len(self.trades_df),
             "tp_trades": len(tp_trades),
-            "drag_trades": len(drag_trades),
+            "rot_trades": len(rot_trades),
+            "stop_trades": len(stop_trades),
             "win_rate": win_rate,
             "spot_harvest_pnl": tp_pnl,
-            "spot_drag_pnl": drag_pnl,
+            "rotation_pnl": rot_pnl,
+            "floor_stop_pnl": stop_pnl,
+            "open_inventory_value": open_market_val,
+            "unrealized_pnl": unrealized_pnl,
             "equity_series": eq_series
         }
 
