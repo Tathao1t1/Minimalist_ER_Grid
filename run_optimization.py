@@ -1,7 +1,18 @@
 import os
 import sys
-import yaml
-import plutus_verify as pv
+try:
+    import plutus_verify as pv
+except ImportError:
+    from contextlib import contextmanager
+    class DummyPV:
+        @staticmethod
+        @contextmanager
+        def step(name):
+            class StepRecorder:
+                def metric(self, *args, **kwargs): pass
+                def artifact(self, *args, **kwargs): pass
+            yield StepRecorder()
+    pv = DummyPV()
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 if curr_dir not in sys.path:

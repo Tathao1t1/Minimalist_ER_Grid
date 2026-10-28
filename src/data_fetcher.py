@@ -32,6 +32,25 @@ def prepare_data(config, split="in_sample"):
     start_date = date_info.get("start_date", "2021-01-01")
     end_date = date_info.get("end_date", "2026-10-01")
     
+    # Load corporate action adjustment factors if available
+    ca_raw = os.path.join(strat_dir, "data", "corporate_actions", "adjustment_factors.parquet")
+    if not os.path.exists(ca_raw):
+        ca_raw = os.path.join(strat_dir, "..", "..", "data", "corporate_actions", "adjustment_factors.parquet")
+        
+    if os.path.exists(ca_raw):
+        ca_df = pd.read_parquet(ca_raw)
+        ca_df["trade_date"] = pd.to_datetime(ca_df["trade_date"]).dt.date
+        bars_df["trade_date"] = bars_df["bar_close"].dt.date
+        bars_df = bars_df.merge(
+            ca_df[["tickersymbol", "trade_date", "adj_factor"]],
+            on=["tickersymbol", "trade_date"],
+            how="left"
+        )
+        bars_df["adj_factor"] = bars_df["adj_factor"].fillna(1.0)
+        for col in ["open", "high", "low", "close"]:
+            if col in bars_df.columns:
+                bars_df[col] = bars_df[col] * bars_df["adj_factor"]
+    
     # Load benchmark daily if exists
     vn30d_raw = data_cfg.get("vn30_daily_file", "")
     vn30d_path = vn30d_raw if os.path.isabs(vn30d_raw) else os.path.join(strat_dir, vn30d_raw)

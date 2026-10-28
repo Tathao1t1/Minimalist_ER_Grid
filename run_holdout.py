@@ -6,7 +6,20 @@ curr_dir = os.path.dirname(os.path.abspath(__file__))
 if curr_dir not in sys.path:
     sys.path.insert(0, curr_dir)
 
-import plutus_verify as pv
+try:
+    import plutus_verify as pv
+except ImportError:
+    from contextlib import contextmanager
+    class DummyPV:
+        @staticmethod
+        @contextmanager
+        def step(name):
+            class StepRecorder:
+                def metric(self, *args, **kwargs): pass
+                def artifact(self, *args, **kwargs): pass
+            yield StepRecorder()
+    pv = DummyPV()
+
 from src.data_fetcher import prepare_data
 from src.logic import MinimalistERGridBacktest, plot_equity_curve
 
@@ -42,7 +55,7 @@ def main():
     print(f"Total Return (HPR): {res['hpr']:+.2f}% ({res['net_profit']:+,.0f} VND)")
     print(f"Annual Return:      {res['annual_return']:+.2f}%")
     print(f"Max Drawdown:       {res['max_drawdown']:.2f}%")
-    print(f"Sharpe Ratio:       {res['sharpe_ratio']:.3f}")
+    print(f"Daily Sharpe:       {res['daily_sharpe']:.3f} (30m Sharpe: {res['sharpe_ratio']:.3f})")
     print(f"Calmar Ratio:       {res['calmar_ratio']:.3f}")
     print(f"Spot Harvest PnL:   {res['spot_harvest_pnl']:+,.0f} VND (TP Trades: {res['tp_trades']})")
     print(f"Spot Drag PnL:      {res['spot_drag_pnl']:+,.0f} VND (Floor Stops: {res['drag_trades']})")

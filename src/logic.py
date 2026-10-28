@@ -177,6 +177,7 @@ class MinimalistERGridBacktest:
         positions = {}
         completed_trades = []
         equity_curve = []
+        last_known_close = {}
         
         wl_dates = sorted(whitelist_by_date.keys())
         cur_wl = []
@@ -186,6 +187,9 @@ class MinimalistERGridBacktest:
             bar_group = bar_group.set_index("tickersymbol")
             cur_date = ts.date()
             
+            for t, row in bar_group.iterrows():
+                last_known_close[t] = float(row["close"])
+                
             if next_wl_idx < len(wl_dates) and cur_date >= wl_dates[next_wl_idx]:
                 cur_wl = whitelist_by_date[wl_dates[next_wl_idx]]
                 next_wl_idx += 1
@@ -214,14 +218,14 @@ class MinimalistERGridBacktest:
 
                     # 2. Floor stop hit during current bar
                     if is_floor_hit:
+                        if ticker in grids:
+                            grids[ticker]["stop_triggered"] = True
                         if can_exit:
-                            fill = max(min(bar_o, floor_stop), floor_stop * 0.93)
+                            fill = min(bar_o, floor_stop)
                             to_remove.append((lvl, fill, True, "floor_stop"))
                         else:
                             # Cannot exit before settlement on HOSE! Mark pending
                             pos["pending_floor_stop"] = True
-                            if ticker in grids:
-                                grids[ticker]["stop_triggered"] = True
                         continue
 
                     # 3. Take-Profit Exit (requires settlement)
@@ -334,10 +338,12 @@ class MinimalistERGridBacktest:
                         "pending_floor_stop": False
                     }
                     
-            pos_val = sum(
-                sum(p["shares"] * float(bar_group.loc[t]["close"]) for p in lvl_dict.values())
-                for t, lvl_dict in positions.items() if t in bar_group.index
-            )
+            pos_val = 0.0
+            for t, lvl_dict in positions.items():
+                tot_shares = sum(p["shares"] for p in lvl_dict.values())
+                if tot_shares > 0:
+                    px = float(bar_group.loc[t]["close"]) if t in bar_group.index else last_known_close.get(t, 0.0)
+                    pos_val += tot_shares * px
             equity_curve.append({"bar_close": ts, "portfolio_value": cash + pos_val})
             
         self.trades_df = pd.DataFrame(completed_trades)
@@ -376,12 +382,21 @@ class MinimalistERGridBacktest:
             longest_dd_days = int(round(max_days))
             
         rets = eq_series.pct_change().dropna()
-        rf_per_bar = self.risk_free_rate / 2016.0
+        bars_per_year = 252.0 * 9.0  # 9 30-minute bars per day on HOSE
+        rf_per_bar = self.risk_free_rate / bars_per_year
         excess_mean = float(rets.mean() - rf_per_bar)
-        sharpe = float(excess_mean / rets.std() * np.sqrt(2016)) if rets.std() > 0 else 0.0
+        sharpe = float(excess_mean / rets.std() * np.sqrt(bars_per_year)) if rets.std() > 0 else 0.0
         downside_rets = rets[rets < rf_per_bar] - rf_per_bar
-        sortino = float(excess_mean / downside_rets.std() * np.sqrt(2016)) if len(downside_rets) > 0 and downside_rets.std() > 0 else 0.0
-        calmar = abs(cagr / max_dd) if max_dd != 0 else 0.0
+        sortino = float(excess_mean / downside_rets.std() * np.sqrt(bars_per_year)) if len(downside_rets) > 0 and downside_rets.std() > 0 else 0.0
+        
+        # Daily resampled Sharpe (institutional quantitative standard)
+        eq_daily = eq_series.resample("D").last().dropna()
+        daily_rets = eq_daily.pct_change().dropna()
+        rf_daily = self.risk_free_rate / 252.0
+        daily_excess = daily_rets.mean() - rf_daily
+        daily_sharpe = float(daily_excess / daily_rets.std() * np.sqrt(252)) if (len(daily_rets) > 0 and daily_rets.std() > 0) else 0.0
+        
+        calmar = (cagr / abs(max_dd)) if max_dd != 0 else 0.0  # Preserves sign for losses
         
         tp_trades = self.trades_df[self.trades_df["reason"] == "target"] if len(self.trades_df) > 0 else pd.DataFrame()
         drag_trades = self.trades_df[self.trades_df["reason"] != "target"] if len(self.trades_df) > 0 else pd.DataFrame()
@@ -399,6 +414,7 @@ class MinimalistERGridBacktest:
             "max_drawdown": max_dd,
             "longest_dd_days": longest_dd_days,
             "sharpe_ratio": sharpe,
+            "daily_sharpe": daily_sharpe,
             "sortino_ratio": sortino,
             "calmar_ratio": calmar,
             "total_trades": len(self.trades_df),
