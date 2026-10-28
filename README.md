@@ -31,11 +31,11 @@ Where:
 
 ```mermaid
 graph TD
-    A[30-Day Price Window] --> B[Calculate Directional Displacement |Pt - Pt-k|]
-    A --> C[Calculate Cumulative Absolute Path Sum]
-    B & C --> D[Kaufman Efficiency Ratio ER]
-    D -->|ER -> 1.0 Trending| E[Exclude from Grid: Danger of Accumulating Losing Lots]
-    D -->|ER -> 0.0 Stationary Oscillation| F[Qualify for Grid Whitelist: High Take-Profit Recurrence]
+    A["30-Day Price Window"] --> B["Calculate Directional Displacement |Pt - Pt-k|"]
+    A --> C["Calculate Cumulative Absolute Path Sum"]
+    B & C --> D["Kaufman Efficiency Ratio (ER)"]
+    D -->|"ER to 1.0 (Trending)"| E["Exclude from Grid: Danger of Accumulating Losing Lots"]
+    D -->|"ER to 0.0 (Stationary Oscillation)"| F["Qualify for Grid Whitelist: High Take-Profit Recurrence"]
 ```
 
 ### Regime Gating Hypothesis
@@ -216,7 +216,7 @@ Saved to [`results/lookback_rebalance_surface.csv`](results/lookback_rebalance_s
 
 #### In-Sample Sensitivity Surface: Calmar Ratio
 
-| Lookback \ Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
+| Lookback / Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
 | :--- | :---: | :---: | :---: | :---: |
 | **20 Days** | $-0.116$ | $-0.094$ | $+0.249$ | $+0.171$ |
 | **30 Days** | $+0.410$ | $+0.313$ | **$+0.437$ (Rank 1)** | $-0.069$ |
@@ -225,7 +225,7 @@ Saved to [`results/lookback_rebalance_surface.csv`](results/lookback_rebalance_s
 
 #### In-Sample Sensitivity Surface: Total Return (%)
 
-| Lookback \ Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
+| Lookback / Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
 | :--- | :---: | :---: | :---: | :---: |
 | **20 Days** | $-2.12\%$ | $-2.12\%$ | $+3.25\%$ | $+2.64\%$ |
 | **30 Days** | $+2.48\%$ | $+3.07\%$ | **$+5.67\%$ (Rank 1)** | $-2.13\%$ |
@@ -248,7 +248,7 @@ The 25-point optimization surface is committed to [`results/optimization_grid_su
 
 #### Full Surface: In-Sample Calmar Ratio Matrix
 
-| Levels ($N$) \ Spacing ($\Delta$) | 2.0% | 2.5% | 3.0% | 3.5% | 4.0% |
+| Levels ($N$) / Spacing ($\Delta$) | 2.0% | 2.5% | 3.0% | 3.5% | 4.0% |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **$N = 12$** | $0.039$ | $0.810$ | $1.056$ | $1.430$ | $1.174$ |
 | **$N = 14$** | $0.613$ | $0.917$ | $1.231$ | **$1.556$ (Interior Peak)** | $1.292$ |
@@ -258,7 +258,7 @@ The 25-point optimization surface is committed to [`results/optimization_grid_su
 
 #### Full Surface: In-Sample Daily Sharpe Ratio Matrix
 
-| Levels ($N$) \ Spacing ($\Delta$) | 2.0% | 2.5% | 3.0% | 3.5% | 4.0% |
+| Levels ($N$) / Spacing ($\Delta$) | 2.0% | 2.5% | 3.0% | 3.5% | 4.0% |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **$N = 12$** | $-1.028$ | $-0.482$ | $-0.588$ | $-0.581$ | $-0.942$ |
 | **$N = 14$** | $-0.569$ | $-0.683$ | $-0.853$ | $-0.885$ | $-1.309$ |
