@@ -407,12 +407,13 @@ class MinimalistERGridBacktest:
                     px = float(bar_group.loc[t]["close"]) if t in bar_group.index else last_known_close.get(t, 0.0)
                     pos_val += tot_shares * px
             if len(cur_wl) > 0 or len(positions) > 0:
-                equity_curve.append({"bar_close": ts, "portfolio_value": cash + pos_val})
+                equity_curve.append({"bar_close": ts, "portfolio_value": cash + pos_val, "invested_val": pos_val})
             
         self.trades_df = pd.DataFrame(completed_trades)
         eq_df = pd.DataFrame(equity_curve)
         eq_series = eq_df.set_index(pd.to_datetime(eq_df["bar_close"]))["portfolio_value"]
         self.equity_series = eq_series
+        avg_invested_pct = float((eq_df["invested_val"] / eq_df["portfolio_value"]).mean() * 100.0) if len(eq_df) > 0 else 0.0
         
         final_val = float(eq_series.iloc[-1])
         net_profit = final_val - self.capital
@@ -574,6 +575,7 @@ class MinimalistERGridBacktest:
             "stop_trades": len(stop_trades),
             "stop_episodes": stop_episodes,
             "win_rate": win_rate,
+            "avg_capital_invested_pct": avg_invested_pct,
             "spot_harvest_pnl": tp_pnl,
             "rotation_pnl": rot_pnl,
             "floor_stop_pnl": stop_pnl,

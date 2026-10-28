@@ -21,8 +21,10 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
-if curr_dir not in sys.path:
-    sys.path.insert(0, curr_dir)
+project_root = os.path.dirname(curr_dir)
+for p in [curr_dir, project_root]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from src.data_fetcher import prepare_data
 from src.logic import MinimalistERGridBacktest, build_zero_overlap_whitelist
@@ -166,7 +168,7 @@ def main():
     print("Testing framework from advisor guidance: ket-hop-tin-hieu-alpha-va-filter.md")
     print("=" * 95)
     
-    cfg_path = os.path.join(curr_dir, "config/config.yaml")
+    cfg_path = os.path.join(project_root, "config/config.yaml")
     with open(cfg_path, "r") as f:
         config = yaml.safe_load(f)
     strat_cfg = config.get("strategy", {})
@@ -261,8 +263,8 @@ def main():
     plt.suptitle("Kiểm chứng Vai trò Tín hiệu: Cộng Alpha (A + B) vs. Sử dụng Filter (A qua Filter B)", fontsize=14.5, fontweight="bold", y=1.02)
     plt.tight_layout()
     
-    os.makedirs(os.path.join(curr_dir, "images"), exist_ok=True)
-    out_img = os.path.join(curr_dir, "images/signal_role_diagnosis.png")
+    os.makedirs(os.path.join(project_root, "images"), exist_ok=True)
+    out_img = os.path.join(project_root, "images/signal_role_diagnosis.png")
     plt.savefig(out_img, dpi=300, bbox_inches="tight")
     plt.close()
     print(f"\nSaved signal diagnosis chart to: {out_img}")

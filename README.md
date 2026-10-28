@@ -12,7 +12,7 @@
 
 The **Kaufman-Range-Grid** system is a systematic, quantitative trading strategy engineered specifically for the microstructure of the Ho Chi Minh Stock Exchange (HOSE). It combines Perry Kaufman's non-parametric **Efficiency Ratio (ER)** as a regime-selection filter with an **adaptive geometric grid execution engine**, harvesting recurring mean-reverting price oscillations without derivative exposure, margin calls, or directional leverage.
 
-The strategy was developed and evaluated end-to-end on **HOSE 30-minute OHLCV bar feeds across the liquid VN30 constituent universe from 2021 to 2026**, adhering strictly to the 9-Step Strategy Development Process and the [Plutus Reproducibility Standard](https://github.com/algotrade-plutus/plutus-guideline). All hyperparameters were selected strictly on the In-Sample period (2021–2023) using an exhaustive grid search constrained by an objective pre-stated volatility rule and committed to [`config/best_params.yaml`](config/best_params.yaml) (see Methodology Note below).
+The strategy was developed and evaluated end-to-end on **HOSE 30-minute OHLCV bar feeds across the liquid VN30 constituent universe from 2021 to 2026**, adhering strictly to the 9-Step Strategy Development Process and the [Plutus Reproducibility Standard](https://github.com/algotrade-plutus/plutus-guideline). All hyperparameters were selected strictly on the In-Sample period (2021–2023) using an exhaustive grid search constrained by an objective rule-based volatility cap derived from In-Sample data and committed to [`config/best_params.yaml`](config/best_params.yaml) (see Methodology Note below).
 
 ---
 
@@ -48,7 +48,7 @@ graph TD
 - **Objective Grid Spacing Bounds (Rule-Based, In-Sample Only)**:
   To distinguish range-bound grid harvesting from multi-week swing trading, grid spacing $\Delta$ is bounded strictly from In-Sample volatility metrics:
   1. **Cost Floor (Lower Bound)**: $\Delta_{\min} = 1.0 \times \text{round-trip friction} = 0.50\%$ ($50\text{ bps} = 15\text{ bps buy} + 15\text{ bps sell} + 10\text{ bps tax} + 10\text{ bps slippage}$). Any spacing below $0.50\%$ produces negative net harvest profit per lot.
-  2. **Oscillation Ceiling (Upper Bound)**: $\Delta_{\max} = \frac{2}{3} \times \text{IS median daily high-low range} = \frac{2}{3} \times 3.14\% = 2.09\% \approx 2.0\%$.
+  2. **Oscillation Ceiling (Upper Bound)**: $\Delta_{\max} = \lfloor \frac{2}{3} \times \text{IS median daily high-low range} \rfloor_{10\text{ bps}} = \lfloor \frac{2}{3} \times 3.14\% \rfloor_{10\text{ bps}} = \lfloor 2.09\% \rfloor = 2.00\%$ (floored to the nearest 10 basis points / 0.10% to guarantee standard quote tick regularity and ensure limit orders remain strictly contained within 2-session intraday swings).
   3. **T+2 Settlement Constraint**: Under HOSE trading rules, an equity lot purchased on day $T$ cannot be sold until $T+2$ at 13:00. Consequently, each harvested oscillation cycle naturally spans at least two trading sessions.
   These bounds are computed dynamically from In-Sample data by `run_data_prep.py` and output to [`config/grid_spacing_bounds.yaml`](config/grid_spacing_bounds.yaml).
 
@@ -59,22 +59,22 @@ To test whether Low-ER selection genuinely adds value over counter-hypotheses an
 python run_benchmark_ablation.py
 ```
 
-| Evaluation Split | Selection Cohort | Total Return (HPR) | Sharpe Ratio ($R_f=6\%$) | Max Drawdown | Win Rate | Floor Stops | Spot Harvest PnL | Rotation PnL |
+| Evaluation Split | Selection Cohort | Total Return (HPR) | Daily Sharpe ($R_f=6\%$) | Max Drawdown | Win Rate | Floor Stops | Spot Harvest PnL | Rotation PnL |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **In-Sample**<br>*(2021–2023)* | **Low ER (Proposed Strategy)** | **$+7.76\%$** | **$-0.734$** | **$-4.16\%$** | **$76.5\%$** | **$0$** | **$+214,548,039\text{ VND}$** | **$-136,901,900\text{ VND}$** |
-|  | High ER (Counter-Hypothesis) | $+0.57\%$ | $-1.825$ | $-6.09\%$ | $76.8\%$ | $16$ | $+98,845,917\text{ VND}$ | $-42,619,842\text{ VND}$ |
-|  | Low ER without SMA Filter | $+7.08\%$ | $-0.799$ | $-5.01\%$ | $76.5\%$ | $0$ | $+214,718,051\text{ VND}$ | $-143,914,036\text{ VND}$ |
-|  | Random Selection (20 Seeds: $+5.13\%$, [$-2.39\%$, $+9.43\%$]) | $+5.13\%$ | $-0.900$ | $-6.73\%$ | $75.8\%$ | $9$ | $+195,776,056\text{ VND}$ | $-120,033,313\text{ VND}$ |
+| **In-Sample**<br>*(2021–2023)* | **Low ER (Proposed Strategy)** | **$+7.76\%$** | **$-0.729$** | **$-4.16\%$** | **$76.5\%$** | **$0$** | **$+214,548,039\text{ VND}$** | **$-136,901,900\text{ VND}$** |
+|  | High ER (Counter-Hypothesis) | $+0.57\%$ | $-1.750$ | $-6.09\%$ | $76.8\%$ | $16$ | $+98,845,917\text{ VND}$ | $-42,619,842\text{ VND}$ |
+|  | Low ER without SMA Filter | $+7.08\%$ | $-0.798$ | $-5.01\%$ | $76.5\%$ | $0$ | $+214,718,051\text{ VND}$ | $-143,914,036\text{ VND}$ |
+|  | Random Selection (20 Seeds: $+5.13\%$, [$-2.39\%$, $+9.43\%$]) | $+5.13\%$ | $-0.879$ | $-6.73\%$ | $75.8\%$ | $9$ | $+195,776,056\text{ VND}$ | $-120,033,313\text{ VND}$ |
 | | *Random Baseline Percentile Rank* | *Low ER: 75.0th percentile* | *Random 20-seed range: [$-2.39\%$, $+9.43\%$]* | — | — | — | — | — |
-| **Out-of-Sample**<br>*(2024)* | **Low ER (Proposed Strategy)** | **$+5.18\%$** | **$-0.403$** | **$-1.66\%$** | **$79.7\%$** | **$0$** | **$+65,718,464\text{ VND}$** | **$-13,817,998\text{ VND}$** |
-|  | High ER (Counter-Hypothesis) | $+4.81\%$ | $-0.604$ | $-0.86\%$ | $79.6\%$ | $0$ | $+57,022,948\text{ VND}$ | $-9,226,653\text{ VND}$ |
-|  | Low ER without SMA Filter | $+4.93\%$ | $-0.473$ | $-1.82\%$ | $76.4\%$ | $0$ | $+64,390,084\text{ VND}$ | $-14,996,392\text{ VND}$ |
-|  | Random Selection (20 Seeds: $+5.52\%$, [$+3.26\%$, $+8.03\%$]) | $+5.52\%$ | $-0.283$ | $-0.95\%$ | $79.0\%$ | $0$ | $+66,096,415\text{ VND}$ | $-10,913,096\text{ VND}$ |
+| **Out-of-Sample**<br>*(2024)* | **Low ER (Proposed Strategy)** | **$+5.18\%$** | **$-0.355$** | **$-1.66\%$** | **$79.7\%$** | **$0$** | **$+65,718,464\text{ VND}$** | **$-13,817,998\text{ VND}$** |
+|  | High ER (Counter-Hypothesis) | $+4.81\%$ | $-0.645$ | $-0.86\%$ | $79.6\%$ | $0$ | $+57,022,948\text{ VND}$ | $-9,226,653\text{ VND}$ |
+|  | Low ER without SMA Filter | $+4.93\%$ | $-0.410$ | $-1.82\%$ | $76.4\%$ | $0$ | $+64,390,084\text{ VND}$ | $-14,996,392\text{ VND}$ |
+|  | Random Selection (20 Seeds: $+5.52\%$, [$+3.26\%$, $+8.03\%$]) | $+5.52\%$ | $-0.269$ | $-0.95\%$ | $79.0\%$ | $0$ | $+66,096,415\text{ VND}$ | $-10,913,096\text{ VND}$ |
 | | *Random Baseline Percentile Rank* | *Low ER: 45.0th percentile* | *Random 20-seed range: [$+3.26\%$, $+8.03\%$]* | — | — | — | — | — |
-| **Forward Holdout**<br>*(2026)* | **Low ER (Proposed Strategy)** | **$+4.71\%$** | **$+0.150$** | **$-3.52\%$** | **$77.8\%$** | **$0$** | **$+86,558,827\text{ VND}$** | **$-39,491,807\text{ VND}$** |
-|  | High ER (Counter-Hypothesis) | $+0.35\%$ | $-0.868$ | $-4.36\%$ | $75.8\%$ | $0$ | $+77,846,372\text{ VND}$ | $-74,364,846\text{ VND}$ |
-|  | Low ER without SMA Filter | $+5.33\%$ | $+0.268$ | $-3.53\%$ | $77.7\%$ | $0$ | $+105,804,011\text{ VND}$ | $-52,529,277\text{ VND}$ |
-|  | Random Selection (20 Seeds: $+2.68\%$, [$-0.36\%$, $+7.41\%$]) | $+2.68\%$ | $-0.381$ | $-3.36\%$ | $77.9\%$ | $1$ | $+77,732,363\text{ VND}$ | $-48,176,520\text{ VND}$ |
+| **Forward Holdout**<br>*(2026)* | **Low ER (Proposed Strategy)** | **$+4.71\%$** | **$+0.152$** | **$-3.52\%$** | **$77.8\%$** | **$0$** | **$+86,558,827\text{ VND}$** | **$-39,491,807\text{ VND}$** |
+|  | High ER (Counter-Hypothesis) | $+0.35\%$ | $-0.853$ | $-4.36\%$ | $75.8\%$ | $0$ | $+77,846,372\text{ VND}$ | $-74,364,846\text{ VND}$ |
+|  | Low ER without SMA Filter | $+5.33\%$ | $+0.277$ | $-3.53\%$ | $77.7\%$ | $0$ | $+105,804,011\text{ VND}$ | $-52,529,277\text{ VND}$ |
+|  | Random Selection (20 Seeds: $+2.68\%$, [$-0.36\%$, $+7.41\%$]) | $+2.68\%$ | $-0.374$ | $-3.36\%$ | $77.9\%$ | $1$ | $+77,732,363\text{ VND}$ | $-48,176,520\text{ VND}$ |
 | | *Random Baseline Percentile Rank* | *Low ER: 75.0th percentile* | *Random 20-seed range: [$-0.36\%$, $+7.41\%$]* | — | — | — | — | — |
 
 ![Benchmark Ablation Comparison](images/benchmark_ablation_comparison.png)
@@ -86,9 +86,9 @@ python run_benchmark_ablation.py
    - In Out-of-Sample (2024), Low ER gained $+5.18\%$, placing at the $45\text{th percentile}$ of random seeds (mean $+5.52\%$, range $+3.26\%$ to $+8.03\%$). In a broad recovery, random selections holding higher-beta stocks captured slightly higher gross gains.
    - In Forward Holdout (2026), Low ER gained $+4.71\%$, placing again at the $75\text{th percentile}$ of the 20-seed random distribution (mean $+2.68\%$).
 3. **Role of the SMA Anchor Gate**:
-   - In the In-Sample bear market, the SMA gate was critical: it reduced maximum drawdown from $-5.01\%$ to $-4.16\%$ and increased net return from $+7.08\%$ to $+7.76\%$ by filtering falling knives.
+   - In the In-Sample bear market, the SMA gate was beneficial: it reduced maximum drawdown from $-5.01\%$ to $-4.16\%$ and increased net return from $+7.08\%$ to $+7.76\%$ by filtering falling knives.
    - In Out-of-Sample (2024), Low ER with SMA ($+5.18\%$) also beat Low ER without SMA ($+4.93\%$).
-   - In the choppy 2026 Holdout, omitting the SMA filter yielded $+5.33\%$ vs $+4.71\%$, as the gate occasionally delayed entries during temporary intraday dips below the 50-bar SMA. The gate was maintained as a core rule because its protective value was established on In-Sample evidence to defend against unhedged downward cascades.
+   - In the choppy 2026 Holdout, omitting the SMA filter yielded $+5.33\%$ vs $+4.71\%$, as the gate delayed entries during temporary intraday dips below the 50-bar SMA. Importantly, both variants registered zero emergency floor stops across all splits. The SMA gate was retained not as a cure for structural catastrophic default, but because In-Sample evidence showed it improved bear-market drawdown control ($-4.16\%$ vs $-5.01\%$) and return ($+7.76\%$ vs $+7.08\%$), accepting a modest performance drag during choppy range-bound drift.
 
 ---
 
@@ -171,7 +171,7 @@ yielding an oscillation margin relative to the entry price of:
 
 $$\text{Margin}(k) = \frac{P_{\text{tp}, k} - P_{\text{buy}, k}}{P_{\text{buy}, k}} = \frac{\Delta}{1 - k\Delta}$$
 
-For $\Delta = 2.0\%$, this ranges from **$2.04\%$ ($k=1$) to $2.78\%$ ($k=16$) gross** ($+1.54\%$ to $+2.28\%$ net after 50 bps transaction friction) per roundtrip cycle.
+For $\Delta = 2.0\%$ and $N = 16$, this ranges from **$2.04\%$ ($k=1$) to $2.94\%$ ($k=16$, since $\frac{0.02}{1 - 16 \times 0.02} = \frac{0.02}{0.68} = 2.94\%$) gross** ($+1.54\%$ to $+2.44\%$ net after 50 bps transaction friction) per roundtrip cycle.
 
 - **Microstructure Realism**: Orders scheduled at bar $t$ become active strictly on bar $t+1$.
 - **Favourable Opening Gap Execution with Slippage**: If bar $t+1$ opens below the limit order ($\text{Open}_{t+1} < P_{\text{buy}, k}$), the trader enjoys favorable price improvement: the fill occurs at $\text{Open}_{t+1} \times (1 + 0.0005)$, capturing price improvement below the limit order plus realistic opening slippage.
@@ -218,9 +218,9 @@ python run_is.py
 | **Market Beta ($\beta$)** | — | **$0.077$** | — | **Low Beta** |
 | **6% Bank Deposit Hurdle** | $+17.38\%$ | **$+17.38\%$** | Reference | **Hurdle Benchmark** |
 | **Beat 6% Hurdle** | — | **No** ($+1.55\%$ vs $+17.38\%$) | Exact | **Underperformed Hurdle** |
-| **Average Capital Invested** | — | **$7.5\%$** ($92.5\%$ Cash) | Monitored | **Low Exposure** |
-| **Take-Profit Harvest PnL** | — | **$+158,264,103\text{ VND}$** | Realized | **Harvest Gross** |
-| **Rotation-Exit PnL** | — | **$-142,786,152\text{ VND}$** | Realized | **Net Drag** |
+| **Average Capital Invested** | — | **$6.2\%$** ($93.8\%$ Cash) | Monitored | **Low Exposure** |
+| **Take-Profit Harvest PnL** | — | **$+158,271,888\text{ VND}$** | Realized | **Harvest Gross** |
+| **Rotation-Exit PnL** | — | **$-142,793,936\text{ VND}$** | Realized | **Net Drag** |
 | **Completed Trades** | $990$ | **$990$** ($679$ TP, $311$ Rotation) | Exact Match | **PASS** |
 | **Win Rate** | $68.59\%$ | **$68.59\%$** | Relative $\pm 5.0\%$ | **PASS** |
 | **Emergency Floor Stops** | $0$ | **$0$ episodes ($0$ lots)** | Exact Match | **PASS** |
@@ -309,7 +309,7 @@ For complete research transparency, the full exploratory surface from $0.5\%$ to
 
 > [!NOTE]
 > **Constraint Trade-Off Disclosure**:
-> Readers should note plainly that the unconstrained In-Sample Calmar ratio continues rising past $2.0\%$, reaching an unconstrained global peak of $1.556$ at $N=14, \Delta=3.5\%$. This occurs because during the severe 2022 secular bear market (VN30 $-42.46\%$ drawdown), wide spacings ($3.0\% - 4.0\%$) minimize limit fills and shelter capital in cash. However, such wide spacings reduce trade turnover to dormancy in normal markets. Imposing the pre-stated rule-based cap $\Delta_{\max} = 2.0\%$ enforces genuine range-bound oscillation harvesting, achieving the constrained interior optimum at **$N = 16, \Delta = 2.0\%$ (Calmar $0.663$)**.
+> Readers should note plainly that the unconstrained In-Sample Calmar ratio continues rising past $2.0\%$, reaching an unconstrained global peak of $1.556$ at $N=14, \Delta=3.5\%$. This occurs because during the severe 2022 secular bear market (VN30 $-42.46\%$ drawdown), wide spacings ($3.0\% - 4.0\%$) minimize limit fills and shelter capital in cash. However, such wide spacings reduce trade turnover to dormancy in normal markets. Imposing the rule-based cap $\Delta_{\max} = 2.0\%$ (formalized post-hoc per Methodology Note) enforces genuine range-bound oscillation harvesting, achieving the constrained interior optimum at **$N = 16, \Delta = 2.0\%$ (Calmar $0.663$)**.
 
 > [!IMPORTANT]
 > **Parameter Selection & Microstructure Friction Analysis**:
@@ -342,9 +342,9 @@ python run_oos.py
 | **Market Beta ($\beta$)** | — | **$0.074$** | — | **Low Beta** |
 | **6% Bank Deposit Hurdle** | $+5.98\%$ | **$+5.98\%$** | Reference | **Hurdle Benchmark** |
 | **Beat 6% Hurdle** | — | **No** ($+5.18\%$ vs $+5.98\%$) | Exact | **Underperformed Hurdle** |
-| **Average Capital Invested** | — | **$4.9\%$** ($95.1\%$ Cash) | Monitored | **Low Exposure** |
-| **Take-Profit Harvest PnL** | — | **$+65,651,478\text{ VND}$** | Realized | **Harvest Gross** |
-| **Rotation-Exit PnL** | — | **$-13,837,296\text{ VND}$** | Realized | **Net Drag** |
+| **Average Capital Invested** | — | **$5.0\%$** ($95.0\%$ Cash) | Monitored | **Low Exposure** |
+| **Take-Profit Harvest PnL** | — | **$+65,718,464\text{ VND}$** | Realized | **Harvest Gross** |
+| **Rotation-Exit PnL** | — | **$-13,817,998\text{ VND}$** | Realized | **Net Drag** |
 | **Completed Trades** | $217$ | **$217$** ($173$ TP, $44$ Rotation) | Exact Match | **PASS** |
 | **Win Rate** | $79.72\%$ | **$79.72\%$** | Relative $\pm 5.0\%$ | **PASS** |
 | **Emergency Floor Stops** | $0$ | **$0$ episodes ($0$ lots)** | Exact Match | **PASS** |
@@ -378,9 +378,9 @@ python run_2025.py
 | **Market Beta ($\beta$)** | **$0.151$** | Low systematic equity correlation |
 | **6% Bank Deposit Hurdle** | **$+5.96\%$** | Over 363 calendar days |
 | **Beat 6% Hurdle** | **Yes** ($+7.04\%$ vs $+5.96\%$) | $+1.08\%$ Alpha Hurdle Excess |
-| **Average Capital Invested** | **$6.3\%$** ($93.7\%$ Cash) | Low Market Exposure |
-| **Take-Profit Harvest PnL** | **$+104,273,891\text{ VND}$** | Realized Harvest |
-| **Rotation-Exit PnL** | **$-35,712,439\text{ VND}$** | Rotation Drag |
+| **Average Capital Invested** | **$6.4\%$** ($93.6\%$ Cash) | Low Market Exposure |
+| **Take-Profit Harvest PnL** | **$+104,268,817\text{ VND}$** | Realized Harvest |
+| **Rotation-Exit PnL** | **$-35,712,776\text{ VND}$** | Rotation Drag |
 | **Completed Trades** | **$323$** ($267$ TP, $56$ Rotation) | $82.66\%$ Win Rate |
 | **Emergency Floor Stops** | **$0$ episodes ($0$ lots)** | Exact Zero |
 | **Period-End Open Inventory** | **$32.36\text{M VND}$** (SHB, VRE) | Unrealized $+1.81\text{M VND}$ |
@@ -415,8 +415,8 @@ python run_holdout.py
 | **6% Bank Deposit Hurdle** | $+4.17\%$ | **$+4.17\%$** | Reference | **Hurdle Benchmark** |
 | **Beat 6% Hurdle** | — | **Yes** ($+4.71\%$ vs $+4.17\%$) | Exact | **Beats Hurdle** |
 | **Average Capital Invested** | — | **$9.4\%$** ($90.6\%$ Cash) | Monitored | **Low Exposure** |
-| **Take-Profit Harvest PnL** | — | **$+86,634,892\text{ VND}$** | Realized | **Harvest Gross** |
-| **Rotation-Exit PnL** | — | **$-39,531,224\text{ VND}$** | Realized | **Net Drag** |
+| **Take-Profit Harvest PnL** | — | **$+86,558,827\text{ VND}$** | Realized | **Harvest Gross** |
+| **Rotation-Exit PnL** | — | **$-39,491,807\text{ VND}$** | Realized | **Net Drag** |
 | **Completed Trades** | $302$ | **$302$** ($235$ TP, $67$ Rotation) | Exact Match | **PASS** |
 | **Win Rate** | $77.81\%$ | **$77.81\%$** | Relative $\pm 5.0\%$ | **PASS** |
 | **Emergency Floor Stops** | $0$ | **$0$ episodes ($0$ lots)** | Exact Match | **PASS** |
@@ -554,10 +554,10 @@ This research presents a rigorous empirical assessment of the **Minimalist Kaufm
    - **Low ER vs. Random Picks**: Low ER achieved the $75\text{th percentile}$ of the 20-seed random distribution in In-Sample ($+7.76\%$ vs $+5.13\%$ mean) and the $75\text{th percentile}$ in Forward Holdout ($+4.71\%$ vs $+2.68\%$ mean), while performing near the median ($45\text{th percentile}$) in 2024 recovery ($+5.18\%$ vs $+5.52\%$ mean).
 
 3. **Role of the SMA Proximity Gate**:
-   - The SMA proximity filter served as a critical risk-reduction mechanism during secular drawdowns, improving In-Sample return ($+7.76\%$ vs $+7.08\%$) and reducing maximum drawdown ($-4.16\%$ vs $-5.01\%$). While it slightly lagged an unconstrained grid in the choppy 2026 period ($+4.71\%$ vs $+5.33\%$) due to delayed entry on brief dips, its retention is mathematically justified by catastrophic crash prevention.
+   - Both the gated and un-gated variants experienced zero emergency floor stops across all periods. The SMA proximity filter provided measurable drawdown moderation in the In-Sample bear market (improving return from $+7.08\%$ to $+7.76\%$ and trimming drawdown from $-5.01\%$ to $-4.16\%$). In the choppy 2026 holdout, however, the gate lagged an unconstrained grid ($+4.71\%$ vs $+5.33\%$) by delaying entries on minor intraday pullbacks. Retaining the gate represents an explicit design choice: accepting a modest drag during choppy sideways markets in exchange for verified drawdown control during sustained market corrections.
 
 4. **Primary Structural Limitations**:
-   - **Capital Drag & Idle Cash**: Because the strategy avoids margin leverage and requires wide cash buffers across $N=16$ geometric levels, average invested capital was only $4.9\% - 9.4\%$ across splits, leaving $\approx 91\% - 95\%$ in non-interest-bearing cash.
+   - **Capital Drag & Idle Cash**: Because the strategy avoids margin leverage and requires wide cash buffers across $N=16$ geometric levels, average invested capital was only $5.0\% - 9.4\%$ across splits (and $6.2\%$ in the baseline In-Sample run), leaving $\approx 90.6\% - 95.0\%$ in non-interest-bearing cash.
    - **Methodology Note (Non-Independence)**: The $2.0\%$ spacing cap was formalized after initial out-of-sample inspection (commits `dce6d2c` → `a068245`). Readers should acknowledge that subsequent downstream splits are not purely independent discoveries.
    - **Single-Market Jurisdiction**: The strategy's dynamics depend heavily on HOSE-specific microstructural features, specifically the lack of intraday short selling, board-lot truncation (100 shares), and mandatory $T+2$ active-session delivery clearing.
 

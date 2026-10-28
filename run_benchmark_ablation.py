@@ -87,7 +87,7 @@ def main():
             "cohort": "Low ER (Proposed Strategy)",
             "hpr": res_low["hpr"],
             "net_profit": res_low["net_profit"],
-            "sharpe": res_low["sharpe_ratio"],
+            "sharpe": res_low["daily_sharpe"],
             "max_dd": res_low["max_drawdown"],
             "win_rate": res_low["win_rate"],
             "tp_trades": res_low.get("tp_trades", 0),
@@ -97,7 +97,7 @@ def main():
             "rotation_pnl": res_low.get("rotation_pnl", 0.0),
             "equity_series": res_low["equity_series"]
         })
-        print(f"  [Low ER (Proposed)]           HPR: {res_low['hpr']:+6.2f}% | Sharpe: {res_low['sharpe_ratio']:5.3f} | MaxDD: {res_low['max_drawdown']:5.2f}% | WinRate: {res_low['win_rate']:5.1f}%")
+        print(f"  [Low ER (Proposed)]           HPR: {res_low['hpr']:+6.2f}% | Daily Sharpe: {res_low['daily_sharpe']:5.3f} | MaxDD: {res_low['max_drawdown']:5.2f}% | WinRate: {res_low['win_rate']:5.1f}%")
         
         # 2. High ER (Counter-Hypothesis)
         res_high = run_experiment("High ER (Counter-Hypothesis)", bundle, strat_cfg, selection_mode="er_high", use_sma_filter=True)
@@ -106,7 +106,7 @@ def main():
             "cohort": "High ER (Counter-Hypothesis)",
             "hpr": res_high["hpr"],
             "net_profit": res_high["net_profit"],
-            "sharpe": res_high["sharpe_ratio"],
+            "sharpe": res_high["daily_sharpe"],
             "max_dd": res_high["max_drawdown"],
             "win_rate": res_high["win_rate"],
             "tp_trades": res_high.get("tp_trades", 0),
@@ -116,7 +116,7 @@ def main():
             "rotation_pnl": res_high.get("rotation_pnl", 0.0),
             "equity_series": res_high["equity_series"]
         })
-        print(f"  [High ER (Counter-Hypothesis)] HPR: {res_high['hpr']:+6.2f}% | Sharpe: {res_high['sharpe_ratio']:5.3f} | MaxDD: {res_high['max_drawdown']:5.2f}% | WinRate: {res_high['win_rate']:5.1f}%")
+        print(f"  [High ER (Counter-Hypothesis)] HPR: {res_high['hpr']:+6.2f}% | Daily Sharpe: {res_high['daily_sharpe']:5.3f} | MaxDD: {res_high['max_drawdown']:5.2f}% | WinRate: {res_high['win_rate']:5.1f}%")
         
         # 3. Low ER without SMA Filter
         res_nosma = run_experiment("Low ER without SMA Filter", bundle, strat_cfg, selection_mode="er_low", use_sma_filter=False)
@@ -125,7 +125,7 @@ def main():
             "cohort": "Low ER without SMA Filter",
             "hpr": res_nosma["hpr"],
             "net_profit": res_nosma["net_profit"],
-            "sharpe": res_nosma["sharpe_ratio"],
+            "sharpe": res_nosma["daily_sharpe"],
             "max_dd": res_nosma["max_drawdown"],
             "win_rate": res_nosma["win_rate"],
             "tp_trades": res_nosma.get("tp_trades", 0),
@@ -135,7 +135,7 @@ def main():
             "rotation_pnl": res_nosma.get("rotation_pnl", 0.0),
             "equity_series": res_nosma["equity_series"]
         })
-        print(f"  [Low ER without SMA Filter]   HPR: {res_nosma['hpr']:+6.2f}% | Sharpe: {res_nosma['sharpe_ratio']:5.3f} | MaxDD: {res_nosma['max_drawdown']:5.2f}% | WinRate: {res_nosma['win_rate']:5.1f}%")
+        print(f"  [Low ER without SMA Filter]   HPR: {res_nosma['hpr']:+6.2f}% | Daily Sharpe: {res_nosma['daily_sharpe']:5.3f} | MaxDD: {res_nosma['max_drawdown']:5.2f}% | WinRate: {res_nosma['win_rate']:5.1f}%")
         
         # 4. Random Selection across 20 distinct seeds (F-6)
         print(f"  Evaluating Random Selection across 20 seeds (1..20)...")
@@ -144,7 +144,7 @@ def main():
         for seed in range(1, 21):
             r_res = run_experiment(f"Random seed={seed}", bundle, strat_cfg, selection_mode="random", use_sma_filter=True, seed=seed)
             r_hprs.append(r_res["hpr"])
-            r_sharpes.append(r_res["sharpe_ratio"])
+            r_sharpes.append(r_res["daily_sharpe"])
             r_mdds.append(r_res["max_drawdown"])
             r_winrates.append(r_res["win_rate"])
             r_stops.append(r_res.get("stop_trades", 0))

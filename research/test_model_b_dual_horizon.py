@@ -20,8 +20,10 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
-if curr_dir not in sys.path:
-    sys.path.insert(0, curr_dir)
+project_root = os.path.dirname(curr_dir)
+for p in [curr_dir, project_root]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from src.data_fetcher import prepare_data
 from src.logic import kaufman_er, get_settlement_dt
@@ -334,11 +336,13 @@ def main():
     print("Macro Trend Direction (Close > SMA_trend) + Micro Mean-Reverting Oscillation (Lowest ER)")
     print("=" * 105)
     
-    cfg_path = os.path.join(curr_dir, "config/config.yaml")
+    cfg_path = os.path.join(project_root, "config/config.yaml")
     with open(cfg_path, "r") as f:
         config = yaml.safe_load(f)
         
-    f_path = "/Users/ttt/Final_Projects_v1/data/benchmark/vn30f1m_30m.parquet"
+    f_path = os.path.join(project_root, "data/benchmark/vn30f1m_30m.parquet")
+    if not os.path.exists(f_path):
+        f_path = "/Users/ttt/Final_Projects_v1/data/benchmark/vn30f1m_30m.parquet"
     f_df = pd.read_parquet(f_path)
     f_df["bar_close"] = pd.to_datetime(f_df["bar_close"])
     vn30f_series = f_df.sort_values("bar_close").set_index("bar_close")["close"]
@@ -420,7 +424,8 @@ def main():
     plt.suptitle("Model B Evaluation: Dual-Horizon Selection (Macro Trend + Micro Low ER)", fontsize=15, fontweight="bold", y=1.02)
     plt.tight_layout()
     
-    out_img = os.path.join(curr_dir, "images/model_b_dual_horizon_comparison.png")
+    os.makedirs(os.path.join(project_root, "images"), exist_ok=True)
+    out_img = os.path.join(project_root, "images/model_b_dual_horizon_comparison.png")
     plt.savefig(out_img, dpi=300, bbox_inches="tight")
     plt.close()
     print(f"\nSaved Model B comparison chart to: {out_img}")

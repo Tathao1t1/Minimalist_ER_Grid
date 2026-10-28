@@ -2,6 +2,8 @@ import os
 import sys
 import yaml
 import pandas as pd
+import numpy as np
+import math
 try:
     import plutus_verify as pv
 except ImportError:
@@ -41,8 +43,11 @@ def compute_is_grid_spacing_bounds(bars_df):
     is_median_hl_range = float(daily["hl_range"].median())
     
     lower_bound = 0.0050
-    upper_bound = min(0.020, round((2.0 / 3.0) * is_median_hl_range, 3))
-    candidate_spacings = [0.005, 0.010, 0.014, 0.018, 0.020]
+    # Rule 3: Upper Bound is floored to the nearest 10 bps (0.10%)
+    # Delta_max = floor(2/3 * IS median daily high-low range to 10 bps) = floor(2.09%) = 2.0%
+    raw_cap = (2.0 / 3.0) * is_median_hl_range
+    upper_bound = float(np.floor(raw_cap * 1000) / 1000)
+    candidate_spacings = [round(lower_bound, 3), 0.010, 0.014, 0.018, round(upper_bound, 3)]
     
     return {
         "is_median_daily_hl_range": round(is_median_hl_range, 5),
@@ -51,7 +56,8 @@ def compute_is_grid_spacing_bounds(bars_df):
         "candidate_spacings": candidate_spacings,
         "rule_description": {
             "lower_bound": "1.0 * round-trip friction (50 bps = 0.50%)",
-            "upper_bound": "2/3 * IS median daily high-low range (3.14% -> 2.09% capped at 2.0%)",
+            "upper_bound": "floor(2/3 * IS median daily high-low range to nearest 10 bps) = floor(2.09%) = 2.0%",
+            "rounding_protocol": "Floored to nearest 10 bps (0.10%) to preserve standard quote tick regularity and conservative range containment",
             "t_plus_2_rule": "A lot cannot be sold before T+2 13:00, requiring at least 2 sessions per cycle"
         }
     }

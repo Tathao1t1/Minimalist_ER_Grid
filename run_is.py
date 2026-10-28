@@ -71,6 +71,7 @@ def main():
     print(f"Strategy Excess Return:       {res['excess_return']:+.2f}%")
     print(f"Market Beta:                  {res['beta']:.3f} (Low systematic exposure)")
     print(f"Annualized Jensen's Alpha:    {res['alpha']:+.2f}%")
+    print(f"Average Capital Invested:     {res['avg_capital_invested_pct']:.1f}% ({100-res['avg_capital_invested_pct']:.1f}% Cash)")
     print("-" * 75)
     print("SPOT HARVEST & TRADE EXECUTION BREAKDOWN (A-3, A-6)")
     print("-" * 75)
