@@ -1,6 +1,7 @@
 import os
 import sys
 import yaml
+import pandas as pd
 try:
     import plutus_verify as pv
 except ImportError:
@@ -20,6 +21,40 @@ if curr_dir not in sys.path:
     sys.path.insert(0, curr_dir)
 
 from src.data_fetcher import prepare_data
+
+def compute_is_grid_spacing_bounds(bars_df):
+    """
+    Computes objective grid spacing bounds strictly from In-Sample (2021-2023) daily volatility (F-1).
+    - Lower Bound (Cost Floor): 1.0 * round-trip friction (50 bps = 0.50%)
+    - Upper Bound (Oscillation Cap): 2/3 * IS median daily high-low range (3.14% -> 2.09% capped at 2.0%)
+    - T+2 Settlement Rule: A lot cannot be sold before T+2 13:00, spanning at least 2 sessions.
+    """
+    df = bars_df.copy()
+    if "bar_close" in df.columns:
+        df["date"] = pd.to_datetime(df["bar_close"]).dt.date
+    elif "datetime" in df.columns:
+        df["date"] = pd.to_datetime(df["datetime"]).dt.date
+    ticker_col = "tickersymbol" if "tickersymbol" in df.columns else "ticker"
+    
+    daily = df.groupby([ticker_col, "date"]).agg({"high": "max", "low": "min", "close": "last"})
+    daily["hl_range"] = (daily["high"] - daily["low"]) / daily["close"]
+    is_median_hl_range = float(daily["hl_range"].median())
+    
+    lower_bound = 0.0050
+    upper_bound = min(0.020, round((2.0 / 3.0) * is_median_hl_range, 3))
+    candidate_spacings = [0.005, 0.010, 0.014, 0.018, 0.020]
+    
+    return {
+        "is_median_daily_hl_range": round(is_median_hl_range, 5),
+        "lower_bound_pct": lower_bound,
+        "upper_bound_pct": upper_bound,
+        "candidate_spacings": candidate_spacings,
+        "rule_description": {
+            "lower_bound": "1.0 * round-trip friction (50 bps = 0.50%)",
+            "upper_bound": "2/3 * IS median daily high-low range (3.14% -> 2.09% capped at 2.0%)",
+            "t_plus_2_rule": "A lot cannot be sold before T+2 13:00, requiring at least 2 sessions per cycle"
+        }
+    }
 
 def main():
     print("=" * 70)
@@ -45,6 +80,15 @@ def main():
     print(f"2025 Bull Test dataset verified: {test_2025_rows:,} bars ({test_2025_bundle['start_date']} to {test_2025_bundle['end_date']})")
     print(f"Holdout dataset verified:       {holdout_rows:,} bars ({holdout_bundle['start_date']} to {holdout_bundle['end_date']})")
     print("All schemas and date boundaries validated successfully.")
+    
+    # Compute and persist objective In-Sample grid spacing bounds (F-1)
+    bounds_info = compute_is_grid_spacing_bounds(is_bundle["bars"])
+    bounds_path = os.path.join(curr_dir, "config/grid_spacing_bounds.yaml")
+    with open(bounds_path, "w") as f:
+        yaml.dump(bounds_info, f, default_flow_style=False, sort_keys=False)
+    print(f"Objective IS spacing bounds computed: Median Range={bounds_info['is_median_daily_hl_range']*100:.2f}%, "
+          f"Bounds=[{bounds_info['lower_bound_pct']*100:.1f}%, {bounds_info['upper_bound_pct']*100:.1f}%]")
+    print(f"Persisted to: {bounds_path}")
     print("=" * 70)
     
     summary_path = os.path.join(curr_dir, "data/data_summary.json")
@@ -55,6 +99,8 @@ def main():
             "out_of_sample_bars": oos_rows,
             "test_2025_bars": test_2025_rows,
             "holdout_bars": holdout_rows,
+            "is_median_daily_hl_range": bounds_info["is_median_daily_hl_range"],
+            "spacing_bounds": [bounds_info["lower_bound_pct"], bounds_info["upper_bound_pct"]],
             "status": "verified"
         }, f, indent=2)
 

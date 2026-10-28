@@ -21,13 +21,27 @@ def run_optimization(config):
     if metric_target in ("sharpe_ratio", "sharpe"):
         metric_target = "daily_sharpe"
         
-    # Search space strictly constrained from 0.5% to 2.0% max (including initial baseline 1.8%)
+    # Read objective grid spacing bounds computed from IS data (F-1)
+    bounds_path = os.path.join(strat_dir, "config/grid_spacing_bounds.yaml")
+    if os.path.exists(bounds_path):
+        with open(bounds_path, "r") as f:
+            bounds_cfg = yaml.safe_load(f)
+        spacing_list = [float(x) for x in bounds_cfg.get("candidate_spacings", [0.005, 0.010, 0.014, 0.018, 0.020])]
+    else:
+        spacing_list = [0.005, 0.010, 0.014, 0.018, 0.020]
+        
     n_levels_list = [12, 14, 16, 18, 20]
-    spacing_list = [0.005, 0.010, 0.014, 0.018, 0.020]
     
-    # In-Sample optimal timing parameters
-    opt_lookback = 30
-    opt_rebalance = 15
+    # Read optimal timing parameters dynamically from sequential sweep output (F-16)
+    sweep_csv = os.path.join(strat_dir, "results/lookback_rebalance_surface.csv")
+    if os.path.exists(sweep_csv):
+        sweep_df = pd.read_csv(sweep_csv)
+        best_sweep_row = sweep_df.loc[sweep_df["is_calmar"].idxmax()]
+        opt_lookback = int(best_sweep_row["lookback"])
+        opt_rebalance = int(best_sweep_row["rebalance"])
+    else:
+        opt_lookback = 30
+        opt_rebalance = 15
     
     print("=" * 80)
     print("EXHAUSTIVE 25-POINT IN-SAMPLE GRID SEARCH (2021-2023)")

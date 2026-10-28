@@ -117,10 +117,16 @@ expected:
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
         value: 990
-        tolerance: {kind: relative, value: 0.05}
+        tolerance: {kind: exact, value: 0}
       - name: tp_trades
         value: 679
-        tolerance: {kind: relative, value: 0.05}
+        tolerance: {kind: exact, value: 0}
+      - name: stop_episodes
+        value: 0
+        tolerance: {kind: exact, value: 0}
+      - name: open_inventory_value
+        value: 0.0
+        tolerance: {kind: exact, value: 0}
     artifacts:
       - path: images/equity_curve_in_sample.png
         compare: visual_similarity
@@ -158,9 +164,15 @@ expected:
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
         value: 217
-        tolerance: {kind: relative, value: 0.05}
+        tolerance: {kind: exact, value: 0}
       - name: tp_trades
         value: 173
+        tolerance: {kind: exact, value: 0}
+      - name: stop_episodes
+        value: 0
+        tolerance: {kind: exact, value: 0}
+      - name: open_inventory_value
+        value: 29152006.0
         tolerance: {kind: relative, value: 0.05}
     artifacts:
       - path: images/equity_curve_out_sample.png
@@ -189,9 +201,15 @@ expected:
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
         value: 323
-        tolerance: {kind: relative, value: 0.05}
+        tolerance: {kind: exact, value: 0}
       - name: tp_trades
         value: 267
+        tolerance: {kind: exact, value: 0}
+      - name: stop_episodes
+        value: 0
+        tolerance: {kind: exact, value: 0}
+      - name: open_inventory_value
+        value: 32360004.0
         tolerance: {kind: relative, value: 0.05}
     artifacts:
       - path: images/equity_curve_2025.png
@@ -220,9 +238,15 @@ expected:
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
         value: 302
-        tolerance: {kind: relative, value: 0.05}
+        tolerance: {kind: exact, value: 0}
       - name: tp_trades
         value: 235
+        tolerance: {kind: exact, value: 0}
+      - name: stop_episodes
+        value: 0
+        tolerance: {kind: exact, value: 0}
+      - name: open_inventory_value
+        value: 15330000.0
         tolerance: {kind: relative, value: 0.05}
     artifacts:
       - path: images/equity_curve_holdout.png
