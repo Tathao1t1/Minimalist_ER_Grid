@@ -9,6 +9,7 @@ if curr_dir not in sys.path:
 try:
     import plutus_verify as pv
 except ImportError:
+    print("[WARNING] plutus_verify module not found; running in standalone mode without recording to .plutus/run/")
     from contextlib import contextmanager
     class DummyPV:
         @staticmethod
@@ -25,7 +26,7 @@ from src.logic import MinimalistERGridBacktest, plot_equity_curve
 
 def main():
     print("=" * 75)
-    print("MINIMALIST ER SPOT GRID — IN-SAMPLE EVALUATION (2021-2023)")
+    print("MINIMALIST ER SPOT GRID — IN-SAMPLE BASELINE EVALUATION (2021-2023)")
     print("=" * 75)
     
     cfg_path = os.path.join(curr_dir, "config/config.yaml")
@@ -33,18 +34,9 @@ def main():
         config = yaml.safe_load(f)
         
     strat_cfg = config.get("strategy", {})
-    best_params_path = os.path.join(curr_dir, "config/best_params.yaml")
-    if os.path.exists(best_params_path):
-        with open(best_params_path, "r") as f:
-            best_cfg = yaml.safe_load(f)
-        opt_strat = best_cfg.get("strategy", {})
-        if "n_levels" in opt_strat:
-            strat_cfg["n_levels"] = opt_strat["n_levels"]
-        if "grid_spacing_pct" in opt_strat:
-            strat_cfg["grid_spacing_pct"] = opt_strat["grid_spacing_pct"]
-        print(f"Piping parameters from config/best_params.yaml: n_levels={strat_cfg['n_levels']}, grid_spacing_pct={strat_cfg['grid_spacing_pct']}")
-    else:
-        print(f"Using default parameters from config.yaml: n_levels={strat_cfg.get('n_levels', 18)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.018)}")
+    # Step 4 evaluates the baseline strategy hypothesis from config.yaml directly.
+    # It strictly avoids forward dependency on optimization outputs (Step 5).
+    print(f"Evaluating baseline parameters from config.yaml: lookback={strat_cfg.get('selection_lookback', 40)}d, rebalance={strat_cfg.get('selection_rebalance_days', 10)}d, n_levels={strat_cfg.get('n_levels', 18)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.018)}")
 
     bundle = prepare_data(config, "in_sample")
     
@@ -77,7 +69,7 @@ def main():
     print(f"VN30 Benchmark HPR:           {res['benchmark_hpr']:+.2f}%")
     print(f"VN30 Benchmark MDD:           {res['benchmark_mdd']:.2f}%")
     print(f"Strategy Excess Return:       {res['excess_return']:+.2f}%")
-    print(f"Market Beta:                  {res['beta']:.3f} (Ultra-low systematic exposure)")
+    print(f"Market Beta:                  {res['beta']:.3f} (Low systematic exposure)")
     print(f"Annualized Jensen's Alpha:    {res['alpha']:+.2f}%")
     print("-" * 75)
     print("SPOT HARVEST & TRADE EXECUTION BREAKDOWN (A-3, A-6)")
@@ -123,7 +115,7 @@ def main():
         plot_equity_curve(
             res["equity_series"],
             strat_cfg.get("capital", 1_000_000_000),
-            "Minimalist ER Spot Grid — Equity vs VN30 Benchmark [IN SAMPLE (2021-2023)]",
+            "Minimalist ER Spot Grid — Equity vs VN30 Benchmark [IN SAMPLE BASELINE (2021-2023)]",
             os.path.join(curr_dir, chart_path),
             bmk_series=res.get("benchmark_series")
         )

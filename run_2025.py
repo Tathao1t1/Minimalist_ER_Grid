@@ -9,6 +9,7 @@ if curr_dir not in sys.path:
 try:
     import plutus_verify as pv
 except ImportError:
+    print("[WARNING] plutus_verify module not found; running in standalone mode without recording to .plutus/run/")
     from contextlib import contextmanager
     class DummyPV:
         @staticmethod
@@ -38,13 +39,12 @@ def main():
         with open(best_params_path, "r") as f:
             best_cfg = yaml.safe_load(f)
         opt_strat = best_cfg.get("strategy", {})
-        if "n_levels" in opt_strat:
-            strat_cfg["n_levels"] = opt_strat["n_levels"]
-        if "grid_spacing_pct" in opt_strat:
-            strat_cfg["grid_spacing_pct"] = opt_strat["grid_spacing_pct"]
-        print(f"Piping parameters from config/best_params.yaml: n_levels={strat_cfg['n_levels']}, grid_spacing_pct={strat_cfg['grid_spacing_pct']}")
+        for k in ["selection_lookback", "selection_rebalance_days", "n_levels", "grid_spacing_pct"]:
+            if k in opt_strat:
+                strat_cfg[k] = opt_strat[k]
+        print(f"Piping parameters from config/best_params.yaml: lookback={strat_cfg.get('selection_lookback')}d, rebalance={strat_cfg.get('selection_rebalance_days')}d, n_levels={strat_cfg['n_levels']}, grid_spacing_pct={strat_cfg['grid_spacing_pct']}")
     else:
-        print(f"Using default parameters from config.yaml: n_levels={strat_cfg.get('n_levels', 18)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.018)}")
+        print(f"Using default parameters from config.yaml: lookback={strat_cfg.get('selection_lookback', 40)}d, rebalance={strat_cfg.get('selection_rebalance_days', 10)}d, n_levels={strat_cfg.get('n_levels', 18)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.018)}")
         
     bundle = prepare_data(config, "test_2025", include_warmup=True)
     
@@ -54,11 +54,11 @@ def main():
         broker_fee=strat_cfg.get("broker_fee", 0.0015),
         sell_tax=strat_cfg.get("sell_tax", 0.0010),
         slippage=strat_cfg.get("slippage", 0.0005),
-        selection_lookback=strat_cfg.get("selection_lookback", 40),
-        selection_rebalance_days=strat_cfg.get("selection_rebalance_days", 10),
+        selection_lookback=strat_cfg.get("selection_lookback", 30),
+        selection_rebalance_days=strat_cfg.get("selection_rebalance_days", 15),
         top_k=strat_cfg.get("top_k", 4),
-        n_levels=strat_cfg.get("n_levels", 18),
-        grid_spacing_pct=strat_cfg.get("grid_spacing_pct", 0.018),
+        n_levels=strat_cfg.get("n_levels", 16),
+        grid_spacing_pct=strat_cfg.get("grid_spacing_pct", 0.028),
         stop_buffer_levels=strat_cfg.get("stop_buffer_levels", 2),
         trend_filter=strat_cfg.get("trend_filter", "none"),
         risk_free_rate=strat_cfg.get("risk_free_rate", 0.06)

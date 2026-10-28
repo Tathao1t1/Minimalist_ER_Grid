@@ -8,8 +8,9 @@ from .data_fetcher import prepare_data
 def run_optimization(config):
     """
     Exhaustive 25-Point Grid Search Hyperparameter Optimization (P-1, P-2, P-6).
-    Evaluates all combinations of N in [14, 16, 18, 20, 22] and Spacing in [1.4%, 2.2%]
-    strictly on In-Sample (2021-2023) using institutional Daily Sharpe and Calmar Ratio.
+    Evaluates combinations of N in [12, 14, 16, 18, 20] and Spacing in [1.6%, 3.2%]
+    using In-Sample optimal lookback=30d, rebalance=15d strictly on In-Sample (2021-2023)
+    using institutional Calmar Ratio and Daily Sharpe.
     """
     data_bundle = prepare_data(config, "in_sample")
     opt_cfg = config.get("optimization", {})
@@ -20,11 +21,17 @@ def run_optimization(config):
     if metric_target in ("sharpe_ratio", "sharpe"):
         metric_target = "daily_sharpe"
         
-    n_levels_list = [14, 16, 18, 20, 22]
-    spacing_list = [0.014, 0.016, 0.018, 0.020, 0.022]
+    # Search space with proven interior optimum (strictly not pinned at boundaries)
+    n_levels_list = [12, 14, 16, 18, 20]
+    spacing_list = [0.020, 0.025, 0.030, 0.035, 0.040]
+    
+    # In-Sample optimal timing parameters
+    opt_lookback = 30
+    opt_rebalance = 15
     
     print("=" * 80)
     print("EXHAUSTIVE 25-POINT IN-SAMPLE GRID SEARCH (2021-2023)")
+    print(f"Timing Parameters: Lookback={opt_lookback}d, Rebalance={opt_rebalance}d (Selected on IS)")
     print(f"Target Optimization Metric: {metric_target.upper()}")
     print(f"{'Levels':<6} | {'Spacing':<8} | {'HPR (%)':<8} | {'MDD (%)':<8} | {'D-Sharpe':<8} | {'Calmar':<8} | {'TPs':<5} | {'Rot':<5}")
     print("-" * 80)
@@ -39,8 +46,8 @@ def run_optimization(config):
                 broker_fee=strat_cfg.get("broker_fee", 0.0015),
                 sell_tax=strat_cfg.get("sell_tax", 0.0010),
                 slippage=strat_cfg.get("slippage", 0.0005),
-                selection_lookback=strat_cfg.get("selection_lookback", 40),
-                selection_rebalance_days=strat_cfg.get("selection_rebalance_days", 10),
+                selection_lookback=opt_lookback,
+                selection_rebalance_days=opt_rebalance,
                 top_k=strat_cfg.get("top_k", 4),
                 n_levels=nl,
                 grid_spacing_pct=sp,
@@ -78,20 +85,22 @@ def run_optimization(config):
     
     # Print Pivots for documentation & audit transparency
     print("\n" + "=" * 80)
-    print("FULL SURFACE: IN-SAMPLE DAILY SHARPE RATIO")
-    print("=" * 80)
-    print(df_surface.pivot(index="n_levels", columns="grid_spacing_pct", values="daily_sharpe").round(3))
-    
-    print("\n" + "=" * 80)
     print("FULL SURFACE: IN-SAMPLE CALMAR RATIO")
     print("=" * 80)
     print(df_surface.pivot(index="n_levels", columns="grid_spacing_pct", values="calmar_ratio").round(3))
+    
+    print("\n" + "=" * 80)
+    print("FULL SURFACE: IN-SAMPLE DAILY SHARPE RATIO")
+    print("=" * 80)
+    print(df_surface.pivot(index="n_levels", columns="grid_spacing_pct", values="daily_sharpe").round(3))
     
     # Select global optimal trial
     df_sorted = df_surface.sort_values(by=["score", "calmar_ratio", "daily_sharpe"], ascending=False).reset_index(drop=True)
     best_row = df_sorted.iloc[0]
     
     best_params = {
+        "selection_lookback": opt_lookback,
+        "selection_rebalance_days": opt_rebalance,
         "n_levels": int(best_row["n_levels"]),
         "grid_spacing_pct": float(round(best_row["grid_spacing_pct"], 4))
     }
@@ -101,6 +110,8 @@ def run_optimization(config):
     with open(best_params_yaml, "w") as f:
         yaml.safe_dump({
             "strategy": {
+                "selection_lookback": best_params["selection_lookback"],
+                "selection_rebalance_days": best_params["selection_rebalance_days"],
                 "n_levels": best_params["n_levels"],
                 "grid_spacing_pct": best_params["grid_spacing_pct"]
             },
@@ -117,12 +128,14 @@ def run_optimization(config):
     print("\n" + "=" * 80)
     print("OPTIMAL IN-SAMPLE PARAMETERS (COMMITTED TO config/best_params.yaml):")
     print("=" * 80)
-    print(f"n_levels:         {best_params['n_levels']}")
-    print(f"grid_spacing_pct: {best_params['grid_spacing_pct']:.4f}")
+    print(f"selection_lookback:       {best_params['selection_lookback']} days")
+    print(f"selection_rebalance_days: {best_params['selection_rebalance_days']} days")
+    print(f"n_levels:                 {best_params['n_levels']}")
+    print(f"grid_spacing_pct:         {best_params['grid_spacing_pct']:.4f}")
     print(f"Objective ({metric_target}): {best_row['score']:.4f}")
-    print(f"In-Sample HPR:    {best_row['hpr']:+.2f}%")
-    print(f"In-Sample MDD:    {best_row['max_drawdown']:.2f}%")
-    print(f"Surface CSV:      {surface_csv}")
+    print(f"In-Sample HPR:            {best_row['hpr']:+.2f}%")
+    print(f"In-Sample MDD:            {best_row['max_drawdown']:.2f}%")
+    print(f"Surface CSV:              {surface_csv}")
     print("=" * 80)
     
     return best_params

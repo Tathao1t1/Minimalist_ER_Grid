@@ -19,6 +19,14 @@ def plot_ticker_grid_overlay(ticker, split="out_sample", start_date="2024-10-15"
     with open(cfg_path, "r") as f:
         config = yaml.safe_load(f)
     strat_cfg = config.get("strategy", {})
+    best_params_path = os.path.join(curr_dir, "config/best_params.yaml")
+    if os.path.exists(best_params_path):
+        with open(best_params_path, "r") as f:
+            best_cfg = yaml.safe_load(f)
+        opt_strat = best_cfg.get("strategy", {})
+        for k in ["selection_lookback", "selection_rebalance_days", "n_levels", "grid_spacing_pct"]:
+            if k in opt_strat:
+                strat_cfg[k] = opt_strat[k]
     
     bundle = prepare_data(config, split)
     sim = MinimalistERGridBacktest(**strat_cfg)

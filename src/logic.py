@@ -95,7 +95,8 @@ def build_zero_overlap_whitelist(
             if use_sma_filter:
                 th = ticker_history.get(ticker)
                 if th is not None:
-                    mask_idx = np.searchsorted(th["dates"], rebal_date, side="right") - 1
+                    # Fix lookahead: side="left" - 1 gets the prior trading day's 15:00 close before rebalance day opens
+                    mask_idx = np.searchsorted(th["dates"], rebal_date, side="left") - 1
                     if mask_idx >= 50:
                         last_c = th["close"][mask_idx]
                         sma_v = th["sma50"][mask_idx]

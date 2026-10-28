@@ -69,13 +69,13 @@ def main():
                 "sharpe": res["sharpe_ratio"],
                 "max_dd": res["max_drawdown"],
                 "win_rate": res["win_rate"],
-                "tp_trades": res["tp_trades"],
-                "drag_trades": res["drag_trades"],
-                "harvest_pnl": res["spot_harvest_pnl"],
-                "drag_pnl": res["spot_drag_pnl"],
+                "tp_trades": res.get("tp_trades", 0),
+                "stop_trades": res.get("stop_trades", 0),
+                "harvest_pnl": res.get("spot_harvest_pnl", 0.0),
+                "stop_pnl": res.get("floor_stop_pnl", 0.0),
                 "equity_series": res["equity_series"]
             })
-            print(f"  [{exp['name'][:30]:<30}] HPR: {res['hpr']:+6.2f}% | Sharpe: {res['sharpe_ratio']:5.3f} | MaxDD: {res['max_drawdown']:5.2f}% | WinRate: {res['win_rate']:5.1f}% | Stops: {res['drag_trades']}")
+            print(f"  [{exp['name'][:30]:<30}] HPR: {res['hpr']:+6.2f}% | Sharpe: {res['sharpe_ratio']:5.3f} | MaxDD: {res['max_drawdown']:5.2f}% | WinRate: {res['win_rate']:5.1f}% | Stops: {res.get('stop_trades', 0)}")
             
     summary_df = pd.DataFrame(all_results)
     
@@ -83,7 +83,7 @@ def main():
     print(f"{'Split':<12} | {'Cohort':<32} | {'Return':<9} | {'Sharpe':<7} | {'MaxDD':<7} | {'WinRate':<7} | {'Stops'}")
     print("-" * 95)
     for _, row in summary_df.iterrows():
-        print(f"{row['split']:<12} | {row['cohort']:<32} | {row['hpr']:+6.2f}%  | {row['sharpe']:6.3f} | {row['max_dd']:6.2f}% | {row['win_rate']:6.1f}% | {row['drag_trades']}")
+        print(f"{row['split']:<12} | {row['cohort']:<32} | {row['hpr']:+6.2f}%  | {row['sharpe']:6.3f} | {row['max_dd']:6.2f}% | {row['win_rate']:6.1f}% | {row['stop_trades']}")
     print("=" * 95)
     
     # Generate Multi-Panel Comparison Visualization with Exact Metric Callouts
@@ -135,7 +135,7 @@ def main():
     print("\n" + "=" * 100)
     print("EXACT MARKDOWN TABLE FOR README:")
     print("=" * 100)
-    print("| Evaluation Split | Selection Cohort | Total Return (HPR) | Sharpe Ratio (Rf=6%) | Max Drawdown | Win Rate | Floor Stops | Spot Harvest PnL | Spot Drag PnL |")
+    print("| Evaluation Split | Selection Cohort | Total Return (HPR) | Sharpe Ratio (Rf=6%) | Max Drawdown | Win Rate | Floor Stops | Spot Harvest PnL | Floor Stop PnL |")
     print("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
     for split in splits:
         split_name = {
@@ -147,7 +147,7 @@ def main():
         for row_idx, (_, r) in enumerate(s_rows.iterrows()):
             sp = split_name if row_idx == 0 else ""
             bold = "**" if "Proposed" in r["cohort"] else ""
-            print(f"| {sp} | {bold}{r['cohort']}{bold} | {bold}{r['hpr']:+.2f}%{bold} | {bold}{r['sharpe']:.3f}{bold} | {bold}{r['max_dd']:.2f}%{bold} | {bold}{r['win_rate']:.1f}%{bold} | {bold}{r['drag_trades']}{bold} | {bold}{r['harvest_pnl']:+,.0f} VND{bold} | {bold}{r['drag_pnl']:+,.0f} VND{bold} |")
+            print(f"| {sp} | {bold}{r['cohort']}{bold} | {bold}{r['hpr']:+.2f}%{bold} | {bold}{r['sharpe']:.3f}{bold} | {bold}{r['max_dd']:.2f}%{bold} | {bold}{r['win_rate']:.1f}%{bold} | {bold}{r['stop_trades']}{bold} | {bold}{r['harvest_pnl']:+,.0f} VND{bold} | {bold}{r['stop_pnl']:+,.0f} VND{bold} |")
     print("=" * 100)
 
 if __name__ == "__main__":
