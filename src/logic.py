@@ -598,31 +598,49 @@ class MinimalistERGridBacktest:
 def plot_equity_curve(eq_series: pd.Series, initial_capital: float, title: str, output_path: str, bmk_series: pd.Series = None):
     """
     Plots a dual-panel equity curve and drawdown chart, saved cleanly to output_path.
-    Optionally overlays normalized VN30 Benchmark equity for institutional transparency (A-1).
+    Uses dual-axis scaling on Panel 1 so that strategy equity oscillations from active trading
+    are clearly resolved and visible to first-time readers, while maintaining benchmark context.
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 7.5), gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
     
-    # Panel 1: Portfolio Value
-    ax1.plot(eq_series.index, eq_series.values / 1e9, label='Strategy Equity (Billion VND)', color='#0284c7', lw=2.0)
+    # Panel 1: Strategy Equity (Left Axis)
+    color_strat = '#0284c7'
+    line_strat = ax1.plot(eq_series.index, eq_series.values / 1e9, label='Strategy Equity (Left Axis)', color=color_strat, lw=2.0)
+    ax1.set_ylabel("Strategy Equity (Billion VND)", fontsize=11, fontweight='bold', color=color_strat)
+    ax1.tick_params(axis='y', labelcolor=color_strat)
     
-    if bmk_series is not None and len(bmk_series) > 0:
-        bmk_norm = (initial_capital / 1e9) * (bmk_series / bmk_series.iloc[0])
-        ax1.plot(bmk_norm.index, bmk_norm.values, label='VN30 Benchmark (Normalized to 1.0B)', color='#f59e0b', linestyle='--', lw=1.5, alpha=0.85)
-        
-    ax1.axhline(initial_capital / 1e9, color='#64748b', linestyle=':', label=f'Initial Capital ({initial_capital/1e9:.1f}B VND)')
+    # Dynamic zoom padding on strategy equity to make active trading oscillations vivid
+    eq_min = eq_series.min() / 1e9
+    eq_max = eq_series.max() / 1e9
+    pad = max((eq_max - eq_min) * 0.15, 0.005)
+    ax1.set_ylim(eq_min - pad, eq_max + pad * 1.5)
+    
     ax1.set_title(title, fontsize=13, fontweight='bold', pad=12)
-    ax1.set_ylabel("Portfolio Value (Billion VND)", fontsize=11)
     ax1.grid(True, linestyle=':', alpha=0.6)
-    ax1.legend(loc='upper left')
     
+    # Secondary Right Axis: Normalized Benchmark
+    if bmk_series is not None and len(bmk_series) > 0:
+        ax1_bmk = ax1.twinx()
+        bmk_norm = (initial_capital / 1e9) * (bmk_series / bmk_series.iloc[0])
+        color_bmk = '#d97706'
+        line_bmk = ax1_bmk.plot(bmk_norm.index, bmk_norm.values, label='VN30 Benchmark (Right Axis)', color=color_bmk, linestyle='--', lw=1.5, alpha=0.85)
+        ax1_bmk.set_ylabel("VN30 Benchmark Normalized (Billion VND)", fontsize=11, fontweight='bold', color=color_bmk)
+        ax1_bmk.tick_params(axis='y', labelcolor=color_bmk)
+        
+        lines = line_strat + line_bmk
+        labels = [l.get_label() for l in lines]
+        ax1.legend(lines, labels, loc='upper left', framealpha=0.9)
+    else:
+        ax1.legend(loc='upper left')
+        
     # Panel 2: Drawdown
     peak = eq_series.cummax()
     dd = (eq_series - peak) / peak * 100.0
     ax2.fill_between(dd.index, dd.values, 0, color='#ef4444', alpha=0.35)
     ax2.plot(dd.index, dd.values, color='#dc2626', lw=1.2, label='Strategy Drawdown (%)')
-    ax2.set_ylabel("Drawdown (%)", fontsize=11)
-    ax2.set_xlabel("Date", fontsize=11)
+    ax2.set_ylabel("Drawdown (%)", fontsize=11, fontweight='bold')
+    ax2.set_xlabel("Date", fontsize=11, fontweight='bold')
     ax2.grid(True, linestyle=':', alpha=0.6)
     ax2.legend(loc='lower left')
     
@@ -630,4 +648,5 @@ def plot_equity_curve(eq_series: pd.Series, initial_capital: float, title: str, 
     plt.savefig(output_path, dpi=200, bbox_inches='tight')
     plt.close(fig)
     print(f"Equity curve chart saved to: {output_path}")
+
 
