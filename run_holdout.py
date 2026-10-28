@@ -33,6 +33,19 @@ def main():
         config = yaml.safe_load(f)
         
     strat_cfg = config.get("strategy", {})
+    best_params_path = os.path.join(curr_dir, "config/best_params.yaml")
+    if os.path.exists(best_params_path):
+        with open(best_params_path, "r") as f:
+            best_cfg = yaml.safe_load(f)
+        opt_strat = best_cfg.get("strategy", {})
+        if "n_levels" in opt_strat:
+            strat_cfg["n_levels"] = opt_strat["n_levels"]
+        if "grid_spacing_pct" in opt_strat:
+            strat_cfg["grid_spacing_pct"] = opt_strat["grid_spacing_pct"]
+        print(f"Piping parameters from config/best_params.yaml: n_levels={strat_cfg['n_levels']}, grid_spacing_pct={strat_cfg['grid_spacing_pct']}")
+    else:
+        print(f"Using default parameters from config.yaml: n_levels={strat_cfg.get('n_levels', 18)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.018)}")
+        
     bundle = prepare_data(config, "holdout")
     
     sim = MinimalistERGridBacktest(

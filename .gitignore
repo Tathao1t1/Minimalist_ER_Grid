@@ -3,7 +3,9 @@ __pycache__/
 *.pyo
 *.pyd
 .DS_Store
-results/
+results/*
+!results/optimization_grid_surface.csv
+!results/lookback_rebalance_surface.csv
 trade_log.txt
 equity_series.csv
 optuna_trials.txt

@@ -1,5 +1,6 @@
 import os
 import sys
+import yaml
 try:
     import plutus_verify as pv
 except ImportError:
@@ -22,7 +23,7 @@ from src.optimizer import run_optimization
 
 def main():
     print("=" * 70)
-    print("PLUTUS STEP 5: HYPERPARAMETER OPTIMIZATION (IN-SAMPLE BAYESIAN)")
+    print("PLUTUS STEP 5: HYPERPARAMETER OPTIMIZATION (IN-SAMPLE EXHAUSTIVE GRID)")
     print("=" * 70)
     
     cfg_path = os.path.join(curr_dir, "config/config.yaml")
@@ -34,6 +35,10 @@ def main():
     with pv.step("optimization") as r:
         r.metric("best_n_levels", int(best_params["n_levels"]), unit="count")
         r.metric("best_grid_spacing_pct", float(best_params["grid_spacing_pct"]), unit="fraction")
+        if os.path.exists(os.path.join(curr_dir, "results/optimization_grid_surface.csv")):
+            r.artifact("grid_surface", "results/optimization_grid_surface.csv", kind="csv")
+        if os.path.exists(os.path.join(curr_dir, "config/best_params.yaml")):
+            r.artifact("best_params", "config/best_params.yaml", kind="other")
 
 if __name__ == "__main__":
     main()

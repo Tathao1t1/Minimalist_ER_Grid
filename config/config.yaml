@@ -10,8 +10,12 @@ data:
   holdout:
     start_date: '2026-01-01'
     end_date: '2026-10-01'
+  test_2025:
+    start_date: '2025-01-01'
+    end_date: '2025-12-31'
   in_sample_file: data/in_sample/in_sample_30m.parquet
   out_sample_file: data/out_of_sample/out_of_sample_30m.parquet
+  test_2025_file: data/test_2025/test_2025_30m.parquet
   holdout_file: data/forward_holdout/forward_holdout_30m.parquet
   vn30_daily_file: data/benchmark/vn30_daily.parquet
   vn30_30m_file: data/benchmark/vn30_30m.parquet
@@ -32,8 +36,8 @@ strategy:
   risk_free_rate: 0.06
 
 optimization:
-  n_trials: 10
-  metric: sharpe_ratio
+  method: "exhaustive_grid"
+  metric: calmar_ratio
   n_levels_range:
   - 14
   - 22

@@ -30,16 +30,19 @@ def main():
     with open(cfg_path, "r") as f:
         config = yaml.safe_load(f)
         
-    is_bundle = prepare_data(config, "in_sample")
-    oos_bundle = prepare_data(config, "out_sample")
-    holdout_bundle = prepare_data(config, "holdout")
+    is_bundle = prepare_data(config, "in_sample", include_warmup=False)
+    oos_bundle = prepare_data(config, "out_sample", include_warmup=False)
+    test_2025_bundle = prepare_data(config, "test_2025", include_warmup=False)
+    holdout_bundle = prepare_data(config, "holdout", include_warmup=False)
     
     is_rows = len(is_bundle["bars"])
     oos_rows = len(oos_bundle["bars"])
+    test_2025_rows = len(test_2025_bundle["bars"])
     holdout_rows = len(holdout_bundle["bars"])
     
     print(f"In-Sample dataset verified:     {is_rows:,} bars ({is_bundle['start_date']} to {is_bundle['end_date']})")
     print(f"Out-of-Sample dataset verified: {oos_rows:,} bars ({oos_bundle['start_date']} to {oos_bundle['end_date']})")
+    print(f"2025 Bull Test dataset verified: {test_2025_rows:,} bars ({test_2025_bundle['start_date']} to {test_2025_bundle['end_date']})")
     print(f"Holdout dataset verified:       {holdout_rows:,} bars ({holdout_bundle['start_date']} to {holdout_bundle['end_date']})")
     print("All schemas and date boundaries validated successfully.")
     print("=" * 70)
@@ -50,6 +53,7 @@ def main():
         json.dump({
             "in_sample_bars": is_rows,
             "out_of_sample_bars": oos_rows,
+            "test_2025_bars": test_2025_rows,
             "holdout_bars": holdout_rows,
             "status": "verified"
         }, f, indent=2)
@@ -57,6 +61,7 @@ def main():
     with pv.step("data_preparation") as r:
         r.metric("in_sample_bars", is_rows, unit="count")
         r.metric("out_of_sample_bars", oos_rows, unit="count")
+        r.metric("test_2025_bars", test_2025_rows, unit="count")
         r.metric("holdout_bars", holdout_rows, unit="count")
         r.artifact("data_summary", "data/data_summary.json", kind="json")
 

@@ -1,16 +1,19 @@
 import os
 import pandas as pd
 
-def prepare_data(config, split="in_sample"):
+def prepare_data(config, split="in_sample", include_warmup=True, warmup_days=40):
     """
     Load spot bar dataset and benchmark data for the requested split.
+    Automatically prepends prior historical trading sessions as indicator warm-up (P-4)
+    so trading can begin cleanly on Day 1 of the evaluation period.
     """
     data_cfg = config.get("data", {})
     strat_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     split_map = {
         "out_of_sample": "out_sample",
-        "forward_holdout": "holdout"
+        "forward_holdout": "holdout",
+        "year_2025": "test_2025"
     }
     split_norm = split_map.get(split, split)
     file_key = f"{split_norm}_file"
@@ -34,6 +37,32 @@ def prepare_data(config, split="in_sample"):
         bars_df["bar_close"] = pd.to_datetime(bars_df["bar_close"])
     elif "datetime" in bars_df.columns:
         bars_df["bar_close"] = pd.to_datetime(bars_df["datetime"])
+    bars_df["is_warmup"] = False
+
+    # Pre-split Indicator Warm-up (P-4)
+    if include_warmup and warmup_days > 0:
+        prior_file_map = {
+            "out_sample": "in_sample_file",
+            "test_2025": "out_sample_file",
+            "holdout": "test_2025_file"
+        }
+        prior_key = prior_file_map.get(split_norm)
+        if prior_key and data_cfg.get(prior_key):
+            prior_raw = data_cfg.get(prior_key)
+            prior_path = prior_raw if os.path.isabs(prior_raw) else os.path.join(strat_dir, prior_raw)
+            if not os.path.exists(prior_path):
+                prior_path = os.path.join(strat_dir, "..", "..", prior_raw)
+            if os.path.exists(prior_path):
+                prior_df = pd.read_parquet(prior_path)
+                if "bar_close" in prior_df.columns:
+                    prior_df["bar_close"] = pd.to_datetime(prior_df["bar_close"])
+                elif "datetime" in prior_df.columns:
+                    prior_df["bar_close"] = pd.to_datetime(prior_df["datetime"])
+                prior_dates = sorted(prior_df["bar_close"].dt.date.unique())
+                warmup_target_dates = prior_dates[-warmup_days:]
+                prior_warmup = prior_df[prior_df["bar_close"].dt.date.isin(warmup_target_dates)].copy()
+                prior_warmup["is_warmup"] = True
+                bars_df = pd.concat([prior_warmup, bars_df]).sort_values(["bar_close", "tickersymbol"]).reset_index(drop=True)
         
     date_info = data_cfg.get(split, {})
     start_date = date_info.get("start_date", "2021-01-01")

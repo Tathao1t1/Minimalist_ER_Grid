@@ -231,6 +231,7 @@ class MinimalistERGridBacktest:
         for ts, bar_group in bars_df.groupby("bar_close", sort=True):
             bar_group = bar_group.set_index("tickersymbol")
             cur_date = ts.date()
+            is_warmup_bar = bool(bar_group["is_warmup"].iloc[0]) if "is_warmup" in bar_group.columns else False
             
             for t, row in bar_group.iterrows():
                 last_known_close[t] = float(row["close"])
@@ -238,6 +239,9 @@ class MinimalistERGridBacktest:
             if next_wl_idx < len(wl_dates) and cur_date >= wl_dates[next_wl_idx]:
                 cur_wl = whitelist_by_date[wl_dates[next_wl_idx]]
                 next_wl_idx += 1
+                
+            if is_warmup_bar:
+                continue
                 
             # PASS 1: EXIT / SELL EVALUATION
             for ticker in list(positions.keys()):
@@ -401,7 +405,8 @@ class MinimalistERGridBacktest:
                 if tot_shares > 0:
                     px = float(bar_group.loc[t]["close"]) if t in bar_group.index else last_known_close.get(t, 0.0)
                     pos_val += tot_shares * px
-            equity_curve.append({"bar_close": ts, "portfolio_value": cash + pos_val})
+            if len(cur_wl) > 0 or len(positions) > 0:
+                equity_curve.append({"bar_close": ts, "portfolio_value": cash + pos_val})
             
         self.trades_df = pd.DataFrame(completed_trades)
         eq_df = pd.DataFrame(equity_curve)
