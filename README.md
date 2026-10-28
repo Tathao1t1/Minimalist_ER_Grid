@@ -5,7 +5,7 @@
 
 The **Kaufman-Range-Grid** system is a systematic algorithmic trading strategy engineered specifically for the Ho Chi Minh Stock Exchange (HOSE). It combines Perry Kaufman's non-parametric **Efficiency Ratio (ER)** as an equity selection filter with an **18-level geometric grid execution engine**, harvesting recurring mean-reverting price oscillations without derivative exposure, margin calls, or directional leverage.
 
-The strategy was developed and evaluated end-to-end on **HOSE 30-minute OHLCV bar feeds across the VN30 constituent universe from 2021 to 2026** following the [9-step Development Process](file:///Users/ttt/Final_Projects_v1/book.md) and the [Plutus Reproducibility Standard](https://github.com/algotrade-plutus/plutus-guideline). On the in-sample period (2021–2023, encompassing the historic -35% VN30 market crash), the strategy harvested **+262,036,062 VND** in closed oscillation profits with an in-sample return of **-11.47%** (significantly outperforming the benchmark crash); on the out-of-sample period (2024), it delivered **+8.90% Net Return** with a **100.0% Win Rate** and a maximum drawdown of only **-3.30%**; on the blind forward holdout period (2025–2026), it achieved **+7.29% Net Return** with a **100.0% Win Rate** and a maximum drawdown of **-6.88%**. Every reported metric is fully reproducible in an isolated Docker container via `plutus-verify` against committed groundtruth baselines.
+The strategy was developed and evaluated end-to-end on **HOSE 30-minute OHLCV bar feeds across the VN30 constituent universe from 2021 to 2026** following the [9-step Development Process](file:///Users/ttt/Final_Projects_v1/book.md) and the [Plutus Reproducibility Standard](https://github.com/algotrade-plutus/plutus-guideline). On the in-sample period (2021–2023, encompassing the historic -35% VN30 market crash), the strategy harvested **+262,036,062 VND** in closed oscillation profits with an in-sample return of **-11.47%** (significantly outperforming the benchmark crash); on the out-of-sample period (2024), it delivered **+8.90% Net Return** with a **100.0% Win Rate** and a maximum drawdown of only **-3.30%**; on the blind forward holdout period (January–September 2026, 8.5 months), it achieved **+7.29% Net Return** (+10.55% Annualized) with a **100.0% Win Rate** and a maximum drawdown of **-6.88%**. Every reported metric is fully reproducible in an isolated Docker container via `plutus-verify` against committed groundtruth baselines.
 
 ---
 
@@ -47,9 +47,10 @@ Where:
 - **Data Source**: Official HOSE 30-minute OHLCV bar feeds.
 - **Constituent Universe**: Liquid VN30 basket constituents (re-evaluated point-in-time every 10 trading days).
 - **Evaluation Splits**:
-  - **In-Sample (IS)**: `2021-01-01` to `2023-12-31` (192,886 bars) — Captures the historic 2021 bull run and the brutal 2022 secular bear market (-35% VN30).
-  - **Out-of-Sample (OOS)**: `2024-01-01` to `2024-12-31` (67,428 bars) — Range-bound consolidation and recovery.
-  - **Forward Blind Holdout**: `2025-01-01` to `2026-03-31` (46,203 bars) — Choppy downward surges (-3.44% VN30).
+  - **In-Sample (IS)**: `2021-01-15` to `2023-12-29` (3 full calendar years, 722 trading days, 192,886 bars) — Captures the historic 2021 bull run and the brutal 2022 secular bear market (-35% VN30).
+  - **Out-of-Sample (OOS)**: `2024-01-02` to `2024-12-31` (1 full calendar year, 250 trading days, 67,428 bars) — Range-bound consolidation and recovery.
+  - **Forward Blind Holdout**: `2026-01-05` to `2026-09-18` (8.5 months, 174 trading days, 46,203 bars) — Blind evaluation under choppy downward surges (-3.44% VN30 drift).
+  - *Data Split Rationale*: The year **2025 was deliberately kept as an embargo buffer (gap year)** between OOS and Forward Holdout to eliminate autocorrelation bleed and ensure strict statistical independence for blind testing.
 
 ### Data Hygiene & Zero Lookahead Bias
 1. **Strict Walk-Forward Separation**:
@@ -232,6 +233,16 @@ python run_is.py
 ### In-Sample Performance Analysis
 During the 2022 bear market, the grid generated **+262,036,062 VND** in gross oscillation profits across 890 take-profit fills. The catastrophic floor stop capped losses at -220,277,272 VND, allowing the fund to preserve capital and survive the -35% market drop with an overall portfolio loss of only -11.47%.
 
+> [!NOTE]
+> **Methodological Note on In-Sample Sharpe Ratio (30-Minute vs. Daily)**:
+> The metric `Sharpe Ratio: 0.071` reported in the Plutus verification manifest is calculated directly on high-frequency **30-minute bar percentage returns** ($\mu_{\text{30m}} = +0.0048\%$ per bar). Because 92.5% of completed trades were small positive take-profit harvests ($+1.60\%$), the bar-level arithmetic average is slightly positive and exceeds the per-bar risk-free rate ($0.06 / 2016 = 0.00298\%$). However, during the severe 2022 secular crash, 72 catastrophic floor stops produced large asymmetric downward gap shocks. Under geometric compounding, the high second-moment variance ($-\frac{1}{2}\sigma^2$, or volatility drag) pulled cumulative total return down to **-11.47%** (CAGR **-4.04%**).
+> 
+> When evaluated on standard institutional **Daily resampled returns**, the aggregated daily return correctly reflects this drag:
+> - **Daily Sharpe ($R_f = 6.0\%$)**: **-0.749**
+> - **Daily Sharpe ($R_f = 0.0\%$)**: **-0.273**
+> 
+> Both metrics are mathematically sound: 30-minute bar Sharpe measures local oscillation capture frequency, while Daily Sharpe captures multi-year portfolio capital preservation under tail-risk shocks.
+
 ![In-Sample Equity Curve](images/equity_curve_in_sample.png)
 
 *Figure 1: In-Sample Equity Curve (2021–2023) showing cash flow generation and downside containment during the 2022 market downturn.*
@@ -326,7 +337,7 @@ During the 2024 out-of-sample period, the strategy achieved a **100.0% Win Rate*
 
 ## 7. Paper Trading & Forward Holdout Evaluation
 
-- **Evaluation Window**: `2025-01-01` to `2026-03-31` (15 months, 46,203 bars).
+- **Evaluation Window**: `2026-01-05` to `2026-09-18` (8.5 months / 174 trading days / 256.2 calendar days, 46,203 bars). The year 2025 served as an unobserved embargo gap year.
 - **Macroeconomic Regime**: Blind forward evaluation under choppy market conditions (-3.44% VN30 index drift).
 
 ```bash
@@ -345,9 +356,26 @@ python run_holdout.py
 | **Total Closed Trades** | 288 | **288** | Exact Match ($0$) |
 | **Take-Profit Trades** | 288 | **288** | Exact Match ($0$) |
 
+> [!NOTE]
+> **Why Annualized Return (CAGR: +10.55%) is Higher than Total Return (HPR: +7.29%)**:
+> By standard financial compounding definition, Annualized Return scales returns to a 12-month (365.25-day) annual basis:
+> 
+> $$
+> \text{CAGR} = (1 + \text{HPR})^{\frac{365.25}{\text{Days}}} - 1
+> $$
+> 
+> Because the Forward Holdout evaluation window spans **256.2 calendar days (0.7015 years < 1.0 year)**, the compounding exponent is greater than one: $\frac{365.25}{256.2} \approx 1.4255$.
+> Generating **+7.29% in only 8.5 months** scales up to an annualized compounding rate of:
+> 
+> $$
+> \text{CAGR} = (1 + 0.0729)^{1.4255} - 1 = \mathbf{+10.55\%}
+> $$
+> 
+> For periods longer than 1 year (e.g. In-Sample: 2.95 years), CAGR is lower than HPR ($-4.04\% > -11.47\%$). For periods shorter than 1 year (e.g. Holdout: 8.5 months), CAGR is higher than HPR.
+
 ![Forward Holdout Equity Curve](images/equity_curve_holdout.png)
 
-*Figure 3: Forward Blind Holdout Equity Curve (2025–2026) demonstrating steady alpha generation while the benchmark market trended down.*
+*Figure 3: Forward Blind Holdout Equity Curve (January–September 2026) demonstrating steady alpha generation while the benchmark market trended down.*
 
 ---
 
