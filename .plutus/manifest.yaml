@@ -175,10 +175,10 @@ expected:
         threshold: 0.70
 
 nine_step_coverage:
-  step_1_hypothesis: {present: true, section: "1. Strategy Thesis & Core Hypothesis"}
-  step_2_data_preparation: {present: true, section: "2. Data Ingestion & Hygiene"}
-  step_3_forming_set_of_rules: {present: true, section: "3. Minimalist ER Spot Grid Architecture"}
-  step_4_in_sample: {present: true, section: "4. In-Sample Backtesting (2021–2023)"}
-  step_5_optimization: {present: true, section: "5. Parameter Stability & Bayesian Tuning"}
-  step_6_out_of_sample: {present: true, section: "6. Out-of-Sample Stress Testing (2024)"}
-  step_7_paper_trading: {present: true, section: "7. Final Blind Holdout Evaluation (2025)"}
+  step_1_hypothesis: {present: true, section: "1. Forming Algorithm Hypothesis"}
+  step_2_data_preparation: {present: true, section: "2. Data Preparation"}
+  step_3_forming_set_of_rules: {present: true, section: "3. Transforming a Hypothesis to a Set of Rules"}
+  step_4_in_sample: {present: true, section: "4. Backtesting on In-Sample Data"}
+  step_5_optimization: {present: true, section: "5. Optimization"}
+  step_6_out_of_sample: {present: true, section: "6. Backtesting on Out-of-Sample Historical Data"}
+  step_7_paper_trading: {present: true, section: "7. Paper Trading & Forward Holdout Evaluation"}
