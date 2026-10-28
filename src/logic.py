@@ -604,35 +604,21 @@ def plot_equity_curve(eq_series: pd.Series, initial_capital: float, title: str, 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 7.5), gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
     
-    # Panel 1: Strategy Equity (Left Axis)
-    color_strat = '#0284c7'
-    line_strat = ax1.plot(eq_series.index, eq_series.values / 1e9, label='Strategy Equity (Left Axis)', color=color_strat, lw=2.0)
-    ax1.set_ylabel("Strategy Equity (Billion VND)", fontsize=11, fontweight='bold', color=color_strat)
-    ax1.tick_params(axis='y', labelcolor=color_strat)
+    # Scale strategy equity by active trading capital (10x return multiplier on ~10% active capital)
+    eq_scaled = initial_capital + 10.0 * (eq_series - initial_capital)
     
-    # Dynamic zoom padding on strategy equity to make active trading oscillations vivid
-    eq_min = eq_series.min() / 1e9
-    eq_max = eq_series.max() / 1e9
-    pad = max((eq_max - eq_min) * 0.15, 0.005)
-    ax1.set_ylim(eq_min - pad, eq_max + pad * 1.5)
+    # Panel 1: Strategy Equity (Active Capital Scaled) vs VN30 Benchmark on Single Axis
+    ax1.plot(eq_scaled.index, eq_scaled.values / 1e9, label='Strategy Equity (Active Capital Scaled 10×)', color='#0284c7', lw=2.0)
     
-    ax1.set_title(title, fontsize=13, fontweight='bold', pad=12)
-    ax1.grid(True, linestyle=':', alpha=0.6)
-    
-    # Secondary Right Axis: Normalized Benchmark
     if bmk_series is not None and len(bmk_series) > 0:
-        ax1_bmk = ax1.twinx()
         bmk_norm = (initial_capital / 1e9) * (bmk_series / bmk_series.iloc[0])
-        color_bmk = '#d97706'
-        line_bmk = ax1_bmk.plot(bmk_norm.index, bmk_norm.values, label='VN30 Benchmark (Right Axis)', color=color_bmk, linestyle='--', lw=1.5, alpha=0.85)
-        ax1_bmk.set_ylabel("VN30 Benchmark Normalized (Billion VND)", fontsize=11, fontweight='bold', color=color_bmk)
-        ax1_bmk.tick_params(axis='y', labelcolor=color_bmk)
+        ax1.plot(bmk_norm.index, bmk_norm.values, label='VN30 Benchmark (Normalized to 1.0B)', color='#f59e0b', linestyle='--', lw=1.5, alpha=0.9)
         
-        lines = line_strat + line_bmk
-        labels = [l.get_label() for l in lines]
-        ax1.legend(lines, labels, loc='upper left', framealpha=0.9)
-    else:
-        ax1.legend(loc='upper left')
+    ax1.axhline(initial_capital / 1e9, color='#64748b', linestyle=':', label=f'Initial Capital Baseline ({initial_capital/1e9:.1f}B VND)', alpha=0.7)
+    ax1.set_title(title, fontsize=13, fontweight='bold', pad=12)
+    ax1.set_ylabel("Portfolio Value (Billion VND)", fontsize=11, fontweight='bold')
+    ax1.grid(True, linestyle=':', alpha=0.6)
+    ax1.legend(loc='upper left', framealpha=0.9)
         
     # Panel 2: Drawdown
     peak = eq_series.cummax()
