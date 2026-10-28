@@ -460,27 +460,100 @@ class MinimalistERGridBacktest:
         
         calmar = (cagr / abs(max_dd)) if max_dd != 0 else 0.0  # Preserves sign for losses (A-15)
         
+        # Floor-stop trade lots vs distinct liquidation episodes (A-3)
         tp_trades = self.trades_df[self.trades_df["reason"] == "target"] if len(self.trades_df) > 0 else pd.DataFrame()
         rot_trades = self.trades_df[self.trades_df["reason"].str.contains("rotation")] if len(self.trades_df) > 0 else pd.DataFrame()
         stop_trades = self.trades_df[self.trades_df["reason"].str.contains("floor_stop")] if len(self.trades_df) > 0 else pd.DataFrame()
         
+        if len(stop_trades) > 0:
+            stop_trades_copy = stop_trades.copy()
+            stop_trades_copy["exit_date"] = pd.to_datetime(stop_trades_copy["exit_ts"]).dt.date
+            stop_episodes = int(len(stop_trades_copy.groupby(["ticker", "exit_date"])))
+        else:
+            stop_episodes = 0
+            
         tp_pnl = float(tp_trades["pnl"].sum()) if len(tp_trades) > 0 else 0.0
         rot_pnl = float(rot_trades["pnl"].sum()) if len(rot_trades) > 0 else 0.0
         stop_pnl = float(stop_trades["pnl"].sum()) if len(stop_trades) > 0 else 0.0
         win_rate = (len(tp_trades) / len(self.trades_df) * 100.0) if len(self.trades_df) > 0 else 0.0
         
-        # Period-end open inventory mark-to-market (A-4)
+        # Period-end open inventory mark-to-market breakdown (A-4)
+        open_positions = {}
         open_shares_count = 0
         open_cost_basis = 0.0
         for t, l_dict in positions.items():
-            for p in l_dict.values():
-                open_shares_count += p["shares"]
-                open_cost_basis += p["entry_price"] * p["shares"] + p["entry_cost"]
+            tot_s = sum(p["shares"] for p in l_dict.values())
+            if tot_s > 0:
+                open_positions[t] = tot_s
+                for p in l_dict.values():
+                    open_shares_count += p["shares"]
+                    open_cost_basis += p["entry_price"] * p["shares"] + p["entry_cost"]
+                    
         open_market_val = sum(
-            sum(p["shares"] for p in l_dict.values()) * (float(last_known_close.get(t, 0.0)))
-            for t, l_dict in positions.items()
+            open_positions[t] * float(last_known_close.get(t, 0.0))
+            for t in open_positions
         )
         unrealized_pnl = open_market_val - open_cost_basis
+        unrealized_pnl_pct = (unrealized_pnl / open_cost_basis * 100.0) if open_cost_basis > 0 else 0.0
+        
+        # Benchmark VN30 performance metrics & risk comparison (A-1)
+        vn30_df = data_bundle.get("vn30d", pd.DataFrame())
+        bmk_hpr = 0.0
+        bmk_cagr = 0.0
+        bmk_mdd = 0.0
+        bmk_daily_sharpe = 0.0
+        beta = 0.0
+        alpha = 0.0
+        excess_return = 0.0
+        bmk_aligned_series = None
+        
+        if not vn30_df.empty and "datetime" in vn30_df.columns and "close" in vn30_df.columns:
+            vn30_sub = vn30_df.copy()
+            vn30_sub["datetime"] = pd.to_datetime(vn30_sub["datetime"])
+            min_ts = eq_series.index[0]
+            max_ts = eq_series.index[-1]
+            vn30_sub = vn30_sub[(vn30_sub["datetime"] >= min_ts.floor("D")) & (vn30_sub["datetime"] <= max_ts.ceil("D"))].sort_values("datetime")
+            if len(vn30_sub) >= 2:
+                bp0 = float(vn30_sub["close"].iloc[0])
+                bp1 = float(vn30_sub["close"].iloc[-1])
+                bmk_hpr = (bp1 / bp0 - 1.0) * 100.0
+                bmk_days = (vn30_sub["datetime"].iloc[-1] - vn30_sub["datetime"].iloc[0]).total_seconds() / 86400.0
+                bmk_years = max(bmk_days / 365.25, 0.01)
+                bmk_cagr = (((bp1 / bp0) ** (1.0 / bmk_years)) - 1.0) * 100.0
+                
+                # Benchmark MDD
+                bmk_peaks = vn30_sub["close"].cummax()
+                bmk_mdd = float(((vn30_sub["close"] - bmk_peaks) / bmk_peaks).min() * 100.0)
+                
+                # Benchmark Daily Sharpe
+                bmk_rets = vn30_sub["close"].pct_change().dropna()
+                bmk_daily_excess = bmk_rets.mean() - rf_daily
+                bmk_daily_sharpe = float((bmk_daily_excess / bmk_rets.std()) * np.sqrt(252)) if (len(bmk_rets) > 0 and bmk_rets.std() > 0) else 0.0
+                
+                # Beta calculation over aligned daily trading sessions
+                vn30_sub["date"] = vn30_sub["datetime"].dt.date
+                bmk_daily_series = vn30_sub.set_index("date")["close"]
+                bmk_aligned_series = vn30_sub.set_index("datetime")["close"]
+                
+                eq_daily_df = pd.DataFrame({"pv": eq_daily})
+                eq_daily_df["date"] = eq_daily_df.index.date
+                strat_daily_close = eq_daily_df.groupby("date")["pv"].last()
+                
+                aligned = pd.DataFrame({
+                    "strat": strat_daily_close.pct_change(),
+                    "bmk": bmk_daily_series.pct_change()
+                }).dropna()
+                
+                if len(aligned) > 2 and float(np.var(aligned["bmk"])) > 0:
+                    cov_mat = np.cov(aligned["strat"], aligned["bmk"])
+                    cov_sm = float(cov_mat[0][1])
+                    var_m = float(cov_mat[1][1])
+                    beta = float(cov_sm / var_m) if var_m > 0 else 0.0
+                else:
+                    beta = 0.0
+                    
+                excess_return = hpr - bmk_hpr
+                alpha = (cagr - self.risk_free_rate * 100.0) - beta * (bmk_cagr - self.risk_free_rate * 100.0)
         
         return {
             "initial_capital": self.capital,
@@ -498,25 +571,45 @@ class MinimalistERGridBacktest:
             "tp_trades": len(tp_trades),
             "rot_trades": len(rot_trades),
             "stop_trades": len(stop_trades),
+            "stop_episodes": stop_episodes,
             "win_rate": win_rate,
             "spot_harvest_pnl": tp_pnl,
             "rotation_pnl": rot_pnl,
             "floor_stop_pnl": stop_pnl,
+            "open_positions": open_positions,
+            "open_shares_count": open_shares_count,
+            "open_cost_basis": open_cost_basis,
             "open_inventory_value": open_market_val,
             "unrealized_pnl": unrealized_pnl,
+            "unrealized_pnl_pct": unrealized_pnl_pct,
+            "cash_balance": cash,
+            "benchmark_hpr": bmk_hpr,
+            "benchmark_cagr": bmk_cagr,
+            "benchmark_mdd": bmk_mdd,
+            "benchmark_daily_sharpe": bmk_daily_sharpe,
+            "beta": beta,
+            "alpha": alpha,
+            "excess_return": excess_return,
+            "benchmark_series": bmk_aligned_series,
             "equity_series": eq_series
         }
 
-def plot_equity_curve(eq_series: pd.Series, initial_capital: float, title: str, output_path: str):
+def plot_equity_curve(eq_series: pd.Series, initial_capital: float, title: str, output_path: str, bmk_series: pd.Series = None):
     """
     Plots a dual-panel equity curve and drawdown chart, saved cleanly to output_path.
+    Optionally overlays normalized VN30 Benchmark equity for institutional transparency (A-1).
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 7.5), gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
     
     # Panel 1: Portfolio Value
-    ax1.plot(eq_series.index, eq_series.values / 1e9, label='Portfolio Equity (Billion VND)', color='#0284c7', lw=1.8)
-    ax1.axhline(initial_capital / 1e9, color='#64748b', linestyle='--', label=f'Initial Capital ({initial_capital/1e9:.1f}B VND)')
+    ax1.plot(eq_series.index, eq_series.values / 1e9, label='Strategy Equity (Billion VND)', color='#0284c7', lw=2.0)
+    
+    if bmk_series is not None and len(bmk_series) > 0:
+        bmk_norm = (initial_capital / 1e9) * (bmk_series / bmk_series.iloc[0])
+        ax1.plot(bmk_norm.index, bmk_norm.values, label='VN30 Benchmark (Normalized to 1.0B)', color='#f59e0b', linestyle='--', lw=1.5, alpha=0.85)
+        
+    ax1.axhline(initial_capital / 1e9, color='#64748b', linestyle=':', label=f'Initial Capital ({initial_capital/1e9:.1f}B VND)')
     ax1.set_title(title, fontsize=13, fontweight='bold', pad=12)
     ax1.set_ylabel("Portfolio Value (Billion VND)", fontsize=11)
     ax1.grid(True, linestyle=':', alpha=0.6)
@@ -526,7 +619,7 @@ def plot_equity_curve(eq_series: pd.Series, initial_capital: float, title: str, 
     peak = eq_series.cummax()
     dd = (eq_series - peak) / peak * 100.0
     ax2.fill_between(dd.index, dd.values, 0, color='#ef4444', alpha=0.35)
-    ax2.plot(dd.index, dd.values, color='#dc2626', lw=1.2, label='Drawdown (%)')
+    ax2.plot(dd.index, dd.values, color='#dc2626', lw=1.2, label='Strategy Drawdown (%)')
     ax2.set_ylabel("Drawdown (%)", fontsize=11)
     ax2.set_xlabel("Date", fontsize=11)
     ax2.grid(True, linestyle=':', alpha=0.6)

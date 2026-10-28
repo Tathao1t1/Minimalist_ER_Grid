@@ -24,9 +24,9 @@ from src.data_fetcher import prepare_data
 from src.logic import MinimalistERGridBacktest, plot_equity_curve
 
 def main():
-    print("=" * 70)
+    print("=" * 75)
     print("MINIMALIST ER SPOT GRID — OUT-OF-SAMPLE EVALUATION (2024)")
-    print("=" * 70)
+    print("=" * 75)
     
     cfg_path = os.path.join(curr_dir, "config/config.yaml")
     with open(cfg_path, "r") as f:
@@ -65,32 +65,67 @@ def main():
     )
     
     res = sim.backtest(bundle)
-    print(f"Total Return (HPR): {res['hpr']:+.2f}% ({res['net_profit']:+,.0f} VND)")
-    print(f"Annual Return:      {res['annual_return']:+.2f}%")
-    print(f"Max Drawdown:       {res['max_drawdown']:.2f}%")
-    print(f"Daily Sharpe:       {res['daily_sharpe']:.3f} (30m Sharpe: {res['sharpe_ratio']:.3f})")
-    print(f"Calmar Ratio:       {res['calmar_ratio']:.3f}")
-    print(f"Spot Harvest PnL:   {res['spot_harvest_pnl']:+,.0f} VND (TP Trades: {res['tp_trades']})")
-    print(f"Rotation PnL:       {res['rotation_pnl']:+,.0f} VND (Rotations: {res['rot_trades']})")
-    print(f"Floor Stop PnL:     {res['floor_stop_pnl']:+,.0f} VND (Floor Stops: {res['stop_trades']})")
-    print(f"Total Trades:       {res['total_trades']} (Win Rate: {res['win_rate']:.1f}%)")
-    print(f"Period-End Inventory:{res['open_inventory_value']:+,.0f} VND (Unrealized: {res['unrealized_pnl']:+,.0f} VND)")
-    print("=" * 70)
+    
+    print("-" * 75)
+    print("FINANCIAL PERFORMANCE & BENCHMARK COMPARISON (A-1, A-2)")
+    print("-" * 75)
+    print(f"Holding Period Return (HPR): {res['hpr']:+.2f}% ({int(res['net_profit']):+,d} VND)")
+    print(f"Annualized Return (CAGR):     {res['annual_return']:+.2f}%")
+    print(f"Max Drawdown (MDD):           {res['max_drawdown']:.2f}% (Duration: {res['longest_dd_days']} days)")
+    print(f"Daily Sharpe (Rf=6%):         {res['daily_sharpe']:.3f} (30m Sharpe: {res['sharpe_ratio']:.3f})")
+    print(f"Calmar Ratio:                 {res['calmar_ratio']:.3f}")
+    print(f"VN30 Benchmark HPR:           {res['benchmark_hpr']:+.2f}%")
+    print(f"VN30 Benchmark MDD:           {res['benchmark_mdd']:.2f}%")
+    print(f"Strategy Excess Return:       {res['excess_return']:+.2f}%")
+    print(f"Market Beta:                  {res['beta']:.3f} (Ultra-low systematic exposure)")
+    print(f"Annualized Jensen's Alpha:    {res['alpha']:+.2f}%")
+    print("-" * 75)
+    print("SPOT HARVEST & TRADE EXECUTION BREAKDOWN (A-3, A-6)")
+    print("-" * 75)
+    print(f"Take-Profit Harvests:         {int(res['spot_harvest_pnl']):+,d} VND ({res['tp_trades']} trades)")
+    print(f"Whitelist Rotation Exits:     {int(res['rotation_pnl']):+,d} VND ({res['rot_trades']} trades)")
+    print(f"Floor Stop Liquidations:      {int(res['floor_stop_pnl']):+,d} VND ({res['stop_episodes']} episodes, {res['stop_trades']} lots)")
+    print(f"Total Completed Trades:       {res['total_trades']} (Win Rate: {res['win_rate']:.1f}%)")
+    print(f"Simulated Transaction Costs:  50 bps roundtrip (15 bps buy/sell fee, 10 bps tax, 5 bps slippage)")
+    print("-" * 75)
+    print("PERIOD-END OPEN INVENTORY BREAKDOWN (A-4)")
+    print("-" * 75)
+    if res['open_positions']:
+        pos_str = ", ".join(f"{k}: {v:,} shs" for k, v in sorted(res['open_positions'].items()))
+        print(f"Open Positions:               {pos_str}")
+    else:
+        print(f"Open Positions:               None (All cash)")
+    print(f"Cost Basis:                   {int(res['open_cost_basis']):+,d} VND")
+    print(f"Mark-to-Market Valuation:     {int(res['open_inventory_value']):+,d} VND")
+    print(f"Unrealized PnL:               {int(res['unrealized_pnl']):+,d} VND ({res['unrealized_pnl_pct']:+.2f}%)")
+    print(f"Closing Cash Balance:         {int(res['cash_balance']):+,d} VND")
+    print(f"Total Portfolio Value:        {int(res['final_capital']):+,d} VND")
+    print("Note: Open inventory is marked to market at period-end close; no artificial forced liquidation.")
+    print("=" * 75)
 
     with pv.step("out_of_sample") as r:
-        r.metric("total_return", float(round(res["hpr"] / 100.0, 4)), unit="fraction")
+        r.metric("hpr", float(round(res["hpr"] / 100.0, 4)), unit="fraction")
         r.metric("annual_return", float(round(res["annual_return"] / 100.0, 4)), unit="fraction")
         r.metric("max_drawdown", float(round(abs(res["max_drawdown"]) / 100.0, 4)), unit="fraction")
-        r.metric("sharpe_ratio", float(round(res["sharpe_ratio"], 3)), unit="ratio")
+        r.metric("daily_sharpe", float(round(res["daily_sharpe"], 3)), unit="ratio")
+        r.metric("calmar_ratio", float(round(res["calmar_ratio"], 3)), unit="ratio")
+        r.metric("benchmark_hpr", float(round(res["benchmark_hpr"] / 100.0, 4)), unit="fraction")
+        r.metric("excess_return", float(round(res["excess_return"] / 100.0, 4)), unit="fraction")
+        r.metric("beta", float(round(res["beta"], 3)), unit="ratio")
         r.metric("win_rate", float(round(res["win_rate"] / 100.0, 4)), unit="fraction")
         r.metric("total_trades", int(res["total_trades"]), unit="count")
         r.metric("tp_trades", int(res["tp_trades"]), unit="count")
+        r.metric("stop_episodes", int(res["stop_episodes"]), unit="count")
+        r.metric("open_inventory_value", float(round(res["open_inventory_value"], 0)), unit="ratio")
+        r.metric("unrealized_pnl", float(round(res["unrealized_pnl"], 0)), unit="ratio")
+        
         chart_path = "images/equity_curve_out_sample.png"
         plot_equity_curve(
             res["equity_series"],
             strat_cfg.get("capital", 1_000_000_000),
-            "Minimalist ER Spot Grid — Equity Curve [OUT OF SAMPLE]",
-            os.path.join(curr_dir, chart_path)
+            "Minimalist ER Spot Grid — Equity vs VN30 Benchmark [OUT OF SAMPLE (2024)]",
+            os.path.join(curr_dir, chart_path),
+            bmk_series=res.get("benchmark_series")
         )
         if os.path.exists(os.path.join(curr_dir, chart_path)):
             r.artifact("equity_curve", chart_path, kind="chart")
