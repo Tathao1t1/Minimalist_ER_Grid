@@ -598,23 +598,19 @@ class MinimalistERGridBacktest:
 def plot_equity_curve(eq_series: pd.Series, initial_capital: float, title: str, output_path: str, bmk_series: pd.Series = None):
     """
     Plots a dual-panel equity curve and drawdown chart, saved cleanly to output_path.
-    Uses dual-axis scaling on Panel 1 so that strategy equity oscillations from active trading
-    are clearly resolved and visible to first-time readers, while maintaining benchmark context.
+    Overlays normalized VN30 Benchmark equity on standard unscaled axes for institutional transparency.
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 7.5), gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
     
-    # Scale strategy equity by active trading capital (10x return multiplier on ~10% active capital)
-    eq_scaled = initial_capital + 10.0 * (eq_series - initial_capital)
-    
-    # Panel 1: Strategy Equity (Active Capital Scaled) vs VN30 Benchmark on Single Axis
-    ax1.plot(eq_scaled.index, eq_scaled.values / 1e9, label='Strategy Equity (Active Capital Scaled 10×)', color='#0284c7', lw=2.0)
+    # Panel 1: Strategy Equity vs VN30 Benchmark (Standard Unscaled)
+    ax1.plot(eq_series.index, eq_series.values / 1e9, label='Strategy Equity (Billion VND)', color='#0284c7', lw=2.0)
     
     if bmk_series is not None and len(bmk_series) > 0:
         bmk_norm = (initial_capital / 1e9) * (bmk_series / bmk_series.iloc[0])
-        ax1.plot(bmk_norm.index, bmk_norm.values, label='VN30 Benchmark (Normalized to 1.0B)', color='#f59e0b', linestyle='--', lw=1.5, alpha=0.9)
+        ax1.plot(bmk_norm.index, bmk_norm.values, label='VN30 Benchmark (Normalized to 1.0B)', color='#f59e0b', linestyle='--', lw=1.5, alpha=0.85)
         
-    ax1.axhline(initial_capital / 1e9, color='#64748b', linestyle=':', label=f'Initial Capital Baseline ({initial_capital/1e9:.1f}B VND)', alpha=0.7)
+    ax1.axhline(initial_capital / 1e9, color='#64748b', linestyle=':', label=f'Initial Capital ({initial_capital/1e9:.1f}B VND)', alpha=0.7)
     ax1.set_title(title, fontsize=13, fontweight='bold', pad=12)
     ax1.set_ylabel("Portfolio Value (Billion VND)", fontsize=11, fontweight='bold')
     ax1.grid(True, linestyle=':', alpha=0.6)
