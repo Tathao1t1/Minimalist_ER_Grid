@@ -1,8 +1,3 @@
-![Static Badge](https://img.shields.io/badge/PLUTUS-95%25-darkgreen)
-![Static Badge](https://img.shields.io/badge/PLUTUS-PROTO-darkblue)
-
-<sub>_PLUTUS score is an LLM-assessed reference signal (see [plutus-scoring](https://github.com/algotrade-plutus/plutus-guideline)), not a certified quality grade, and is subject to change. The verified guarantee is reproducibility — `plutus check` exits 0._</sub>
-
 # Kaufman-Range-Grid: Non-Parametric Kaufman ER Spot Grid Trading System
 > Non-parametric equity oscillation harvesting engine with zero directional leverage, strictly compliant with HOSE T+2.5 settlement rules.
 
@@ -29,7 +24,9 @@ Rather than attempting to forecast directional breakouts, the **Kaufman-Range-Gr
 
 The core thesis rests on the structural difference between trending and oscillating market regimes:
 
-$$\text{Efficiency Ratio (ER)} = \frac{|\Delta P_N|}{\sum_{i=1}^N |\Delta P_i|} = \frac{|P_t - P_{t-N}|}{\sum_{i=1}^N |P_i - P_{i-1}|}$$
+$$
+\text{Efficiency Ratio (ER)} = \frac{|\Delta P_N|}{\sum_{i=1}^N |\Delta P_i|} = \frac{|P_t - P_{t-N}|}{\sum_{i=1}^N |P_i - P_{i-1}|}
+$$
 
 Where:
 - $P_t$ is the closing price at time $t$.
@@ -95,41 +92,77 @@ The trading system translates the theoretical hypothesis into five deterministic
 Every 10 trading days at market open:
 1. Compute the 40-day Kaufman Efficiency Ratio for all VN30 constituents.
 2. Filter for stocks where the current price is within $\pm 3\%$ of the 50-period Simple Moving Average:
-   $$\frac{|P_t - \text{SMA}_{50}(t)|}{\text{SMA}_{50}(t)} \le 0.03$$
+
+$$
+\frac{|P_t - \text{SMA}_{50}(t)|}{\text{SMA}_{50}(t)} \le 0.03
+$$
+
 3. Rank qualifying equities by ER in ascending order and select the **top 4 lowest-ER stocks**.
 
 ### Rule 2 — Equal Capital Partitioning & Tranche Sizing
-- Total portfolio capital $C_0$ (e.g., 1,000,000,000 VND) is divided equally across the 4 selected stocks ($C_{\text{stock}} = C_0 / 4 = 250,000,000\text{ VND}$).
+- Total portfolio capital $C_0$ (e.g., 1,000,000,000 VND) is divided equally across the 4 selected stocks:
+
+$$
+C_{\text{stock}} = \frac{C_0}{4} = 250{,}000{,}000 \text{ VND}
+$$
+
 - Each stock's capital is divided into $N = 18$ equal tranches:
-  $$\text{Capital per Level } w_k = \frac{C_{\text{stock}}}{18} \approx 13,888,888\text{ VND}$$
+
+$$
+w_k = \frac{C_{\text{stock}}}{18} \approx 13{,}888{,}888 \text{ VND}
+$$
+
 - Order quantities are constrained to HOSE standard board lots of 100 shares:
-  $$Q_k = \left\lfloor \frac{w_k}{\text{Buy\_Limit}_k \times 100} \right\rfloor \times 100$$
+
+$$
+Q_k = \left\lfloor \frac{w_k}{\text{Buy Limit}_k \times 100} \right\rfloor \times 100
+$$
 
 ### Rule 3 — Geometric Grid Deployment & Next-Bar Execution
 The initial anchor price $A_0$ is set to $\text{SMA}_{50}(t)$ at grid initialization. 18 geometric buy limit levels are deployed below the anchor:
-$$\text{Buy\_Limit}_k = A_0 \times (1 - k \times 1.6\%) \quad \text{for } k \in [1, 18]$$
+
+$$
+\text{Buy Limit}_k = A_0 \times (1 - k \times 0.016) \quad \text{for } k \in \{1, 2, \dots, 18\}
+$$
 
 For each filled tranche $k$, an associated take-profit limit order is immediately scheduled:
-$$\text{Target\_TP}_k = A_0 \times (1 - (k-1) \times 1.6\%)$$
+
+$$
+\text{Target TP}_k = A_0 \times (1 - (k-1) \times 0.016)
+$$
+
 yielding a gross oscillation margin of $+1.60\%$ per cycle.
 
 #### Microstructure Realism:
 - **Zero Same-Bar Lookahead**: Orders deployed at bar $t$ close become active strictly on bar $t+1$ (`active_from_ts = bar_ts + 1`).
-- **Pessimistic Gap-Down Execution**: If bar $t+1$ opens below the limit order ($\text{Open}_{t+1} < \text{Buy\_Limit}_k$), execution occurs at the **Open price plus 5 bps slippage**, rather than the favorable limit price.
+- **Pessimistic Gap-Down Execution**: If bar $t+1$ opens below the limit order ($\text{Open}_{t+1} < \text{Buy Limit}_k$), execution occurs at the **Open price plus 5 bps slippage**, rather than the favorable limit price.
 
 ### Rule 4 — Catastrophic Floor Stop with T+2.5 Settlement Enforcement
 To prevent indefinite capital drag during a secular macroeconomic collapse, a catastrophic floor stop is established 2 buffer levels below the deepest buy tier:
-$$\text{Floor\_Stop} = A_0 \times (1 - (18 + 2) \times 1.6\%) = A_0 \times (1 - 32.0\%)$$
+
+$$
+\text{Floor Stop} = A_0 \times (1 - (18 + 2) \times 0.016) = A_0 \times (1 - 0.320) = A_0 \times 0.680
+$$
 
 Under HOSE Circular 120/2020/TT-BTC, shares purchased cannot be sold before $T+2$ 13:00 PM:
-1. If price breaches $\text{Floor\_Stop}$, all further grid limit buying is immediately halted (`stop_triggered = True`).
+1. If price breaches $\text{Floor Stop}$, all further grid limit buying is immediately halted (`stop_triggered = True`).
 2. Shares already legally settled are liquidated immediately at market open.
 3. Unsettled shares are tagged as `pending_floor_stop = True` and liquidated strictly on their legal settlement bar (Day $T+2$, 13:00 PM) at the market open with adverse slippage.
 
 ### Rule 5 — Dynamic Inventory-Proportional VN30F Derivative Short Hedge (Extension)
 To insulate the portfolio from broad market drawdowns while preserving spot grid harvest, an optional short derivative hedge can be overlaid:
-- Hedge Ratio: $h = \min\left(1.0, \frac{\text{Unsettled + Settled Stock Value}}{\text{Portfolio Equity}}\right)$
-- Futures Contracts: $N_{\text{VN30F}} = \left\lfloor \frac{\text{Stock Value} \times h}{P_{\text{VN30F}} \times 100,000} \right\rfloor$
+- Hedge Ratio:
+
+$$
+h = \min\left(1.0, \frac{\text{Unsettled + Settled Stock Value}}{\text{Portfolio Equity}}\right)
+$$
+
+- Futures Contracts:
+
+$$
+N_{\text{VN30F}} = \left\lfloor \frac{\text{Stock Value} \times h}{P_{\text{VN30F}} \times 100{,}000} \right\rfloor
+$$
+
 - Short exposure scales dynamically with inventory accumulation and auto-winds down as grid take-profits execute.
 
 ### Evaluation Metrics
@@ -200,6 +233,7 @@ python run_is.py
 During the 2022 bear market, the grid generated **+262,036,062 VND** in gross oscillation profits across 890 take-profit fills. The catastrophic floor stop capped losses at -220,277,272 VND, allowing the fund to preserve capital and survive the -35% market drop with an overall portfolio loss of only -11.47%.
 
 ![In-Sample Equity Curve](images/equity_curve_in_sample.png)
+
 *Figure 1: In-Sample Equity Curve (2021–2023) showing cash flow generation and downside containment during the 2022 market downturn.*
 
 ---
@@ -231,7 +265,7 @@ The global optimum identified and committed to [`config/config.yaml`](config/con
 }
 ```
 
-### Empirical 2D Parameter Sensitivity Sweep (Lookback $\times$ Rebalance Window)
+### Empirical 2D Parameter Sensitivity Sweep (Lookback × Rebalance Window)
 To address questions regarding time frame selection (40-day lookback for ER vs. 10-day rebalancing), an exhaustive 16-combination parameter sweep was executed across $[20, 30, 40, 60]\text{ days}$ lookback and $[5, 10, 15, 20]\text{ days}$ rebalancing:
 
 ```bash
@@ -240,7 +274,7 @@ python sweep_lookback_rebalance.py
 
 #### Holdout Max Drawdown Sensitivity Matrix (%)
 
-| Lookback \ Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
+| Lookback / Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
 | :--- | :---: | :---: | :---: | :---: |
 | **20 Days** | -26.83% | -25.34% | -26.60% | -24.88% |
 | **30 Days** | -42.64% | -34.63% | -39.95% | -39.95% |
@@ -249,7 +283,7 @@ python sweep_lookback_rebalance.py
 
 #### Holdout Total Return Sensitivity Matrix (%)
 
-| Lookback \ Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
+| Lookback / Rebalance | 5 Days | 10 Days | 15 Days | 20 Days |
 | :--- | :---: | :---: | :---: | :---: |
 | **20 Days** | +2.06% | +4.30% | +8.60% | +12.59% |
 | **30 Days** | -22.57% | -10.27% | +2.52% | +5.54% |
@@ -285,6 +319,7 @@ python run_oos.py
 During the 2024 out-of-sample period, the strategy achieved a **100.0% Win Rate** across 250 closed trades. The 18-level grid captured regular oscillation profits without triggering a single catastrophic floor stop, resulting in a maximum drawdown of only **-3.30%** and an annualized Sharpe ratio of 0.334.
 
 ![Out-of-Sample Equity Curve](images/equity_curve_out_sample.png)
+
 *Figure 2: Out-of-Sample Equity Curve (2024) demonstrating steady, low-volatility capital appreciation.*
 
 ---
@@ -311,6 +346,7 @@ python run_holdout.py
 | **Take-Profit Trades** | 288 | **288** | Exact Match ($0$) |
 
 ![Forward Holdout Equity Curve](images/equity_curve_holdout.png)
+
 *Figure 3: Forward Blind Holdout Equity Curve (2025–2026) demonstrating steady alpha generation while the benchmark market trended down.*
 
 ---
@@ -325,6 +361,7 @@ python visualize_price_grid_overlay.py
 ```
 
 ![Grid Price Overlay Demonstration](images/grid_price_overlay_demonstration.png)
+
 *Figure 4: Active grid matrix on HDB showing 50-SMA anchor (blue line), geometric buy levels $L_1 \dots L_{10}$ (green dashed lines), take-profit targets (teal dashed lines), and inventory liquidation upon technical rebound.*
 
 ### 2. Empirical Validation of Kaufman ER: Oscillation Roundtrips vs. Trend
@@ -335,6 +372,7 @@ python analyze_er_roundtrips.py
 ```
 
 ![ER Roundtrip Comparison](images/er_roundtrip_comparison.png)
+
 *Figure 5: Roundtrip frequency comparison proving Low ER stocks complete significantly more oscillations per unit time with lower inventory drag.*
 
 ### 3. Dynamic Inventory-Proportional VN30F Derivative Short Hedge & Capital Scaling
@@ -345,6 +383,7 @@ python run_inventory_hedge_scale_study.py
 ```
 
 ![Inventory Hedge Scale Comparison](images/inventory_hedge_scale_comparison.png)
+
 *Figure 6: Capital scaling evaluation showing the inventory short hedge successfully compresses maximum drawdown during down-legs across all fund sizes.*
 
 ### 4. Signal Role Diagnosis: Alpha Addition vs. Filter Gating
@@ -359,6 +398,7 @@ python run_signal_role_diagnosis.py
 ```
 
 ![Signal Role Diagnosis](images/signal_role_diagnosis.png)
+
 *Figure 7: Signal topology diagnosis showing directional trend signals exhibit negative standalone expectancy on HOSE, while pure filter gating improves return and cuts drawdown.*
 
 ### 5. Multi-Cohort Benchmark Ablation Study
@@ -373,6 +413,7 @@ python run_benchmark_ablation.py
 ```
 
 ![Benchmark Ablation Comparison](images/benchmark_ablation_comparison.png)
+
 *Figure 8: Benchmark ablation comparison confirming Low ER combined with the SMA proximity gate delivers superior risk-adjusted returns.*
 
 ---
