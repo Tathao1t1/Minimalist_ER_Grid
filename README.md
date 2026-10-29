@@ -81,14 +81,66 @@ An ablation study across evaluation splits evaluates Low ER against High ER, un-
 
 ## Strategy Rules
 
-The operational trading rules are structured as follows:
+The strategy executes under 6 deterministic mathematical rules designed for the Cash-Only HOSE market microstructure ($T+2.5$ settlement, 100-share board lots, no short selling):
 
-- **Rule 1 (Universe Selection & Lookahead Elimination)**: Every 15 trading days at market open, filter VN30 stocks within $\pm 3\%$ of their 50-bar SMA using strictly prior-day close ($t-1$). Rank qualifying stocks by 30-day Kaufman ER ascending; select the top 4 lowest-ER stocks ($k=4$).
-- **Rule 2 (Dynamic Budgeting & Board Lot Truncation)**: Partition initial capital $C_0 = 1\text{B VND}$ equally across 4 stocks ($250\text{M VND}$ each) and $N = 16$ levels ($15.625\text{M VND}$ per tranche). Truncate share orders to 100-share board lots using floor division: $S_k = \lfloor C_{\text{level}} / (P_k \times 100) \rfloor \times 100$.
-- **Rule 3 (Geometric Grid & Execution)**: Initial anchor $A_0 = \text{SMA}_{50}$. Buy limit orders deployed at $P_{\text{buy}, k} = A_0 \times (1 - k \times 0.020)$. Take-profit sell limits scheduled at $P_{\text{tp}, k} = A_0 \times (1 - (k - 1) \times 0.020)$. Gross margin per cycle ranges from $2.04\%$ ($k=1$) to $2.94\%$ ($k=16$, since $\frac{0.02}{0.68} = 2.94\%$) ($+1.54\%$ to $+2.44\%$ net after 50 bps fees). Favorable opening gaps execute at $\text{Open}_{t+1} \times (1 + 0.0005)$.
-- **Rule 4 (Rotation Discipline)**: When a stock rotates off the whitelist, cancel all unfilled buy limits immediately. Liquidate legally cleared ($T+2$) inventory at market close; liquidate pending clearance shares at open immediately upon settlement.
-- **Rule 5 (Emergency Floor Stop)**: Price breach below $P_{\text{floor}} = A_0 \times (1 - 18 \times 0.020) = 0.640 \cdot A_0$ halts all buying and liquidates open inventory upon $T+2$ clearance.
-- **Rule 6 (Period-End MTM Accounting)**: Unsold inventory at period end is marked to market at final bar close without forced liquidation; open inventory and unrealized PnL are reported explicitly.
+### Rule 1 — Universe Selection & Lookahead Elimination
+Every 15 trading days at market open ($T_{\text{reb}} = 15$), screen all VN30 constituents for consolidation around their trend anchor:
+$$
+\left| \frac{\text{Close}_{t-1} - \text{SMA}_{50, t-1}}{\text{SMA}_{50, t-1}} \right| \le 0.03
+$$
+Constituents satisfying this proximity condition are ranked ascending by their 30-day Kaufman Efficiency Ratio ($\text{ER}_{30}$):
+$$
+\text{ER}_{30} = \frac{|\text{Close}_{t-1} - \text{Close}_{t-30}|}{\sum_{i=0}^{29} |\text{Close}_{t-1-i} - \text{Close}_{t-2-i}|}
+$$
+The top $k = 4$ lowest-ER stocks enter the active portfolio whitelist. All indicator inputs evaluate strictly prior-day bar closes ($t-1$) to eliminate lookahead bias.
+
+### Rule 2 — Dynamic Capital Budgeting & Board Lot Truncation
+Portfolio initial equity ($C_0 = 1,000,000,000\text{ VND}$) is partitioned equally across $k = 4$ active stocks ($250,000,000\text{ VND}$ per stock) and subdivided across $N = 16$ geometric levels:
+$$
+C_{\text{level}} = \frac{C_0}{k \times N} = \frac{1,000,000,000}{4 \times 16} = 15,625,000\text{ VND}
+$$
+Order quantities are truncated to HOSE 100-share board lots via floor division:
+$$
+S_i = \left\lfloor \frac{C_{\text{level}}}{P_{\text{buy}, i} \times 100} \right\rfloor \times 100
+$$
+
+### Rule 3 — Geometric Grid Geometry & Limit Execution
+Grid levels are anchored at the 50-period SMA ($A_0 = \text{SMA}_{50}$) and deployed geometrically downward with spacing $\Delta = 2.0\%$:
+$$
+P_{\text{buy}, i} = A_0 \cdot (1 - i \cdot \Delta), \quad i \in \{1, 2, \dots, 16\}
+$$
+Each filled buy tranche immediately places a take-profit limit sell order at the level above:
+$$
+P_{\text{tp}, i} = A_0 \cdot \big(1 - (i - 1) \cdot \Delta\big)
+$$
+Gross profit margin per cycle expands with grid depth:
+$$
+\text{Gross Margin}(i) = \frac{P_{\text{tp}, i} - P_{\text{buy}, i}}{P_{\text{buy}, i}} = \frac{\Delta}{1 - i \cdot \Delta}
+$$
+For Level 1 ($i=1$), the gross margin is $2.04\%$; for Level 16 ($i=16$), the gross margin reaches:
+$$
+\text{Gross Margin}(16) = \frac{0.020}{1 - 16 \times 0.020} = \frac{0.020}{0.680} = 2.94\%
+$$
+Net cycle margin yields $+1.54\%$ to $+2.44\%$ after deducting standard transaction frictions (50 bps roundtrip). Favorable opening gaps execute at $\text{Open}_{t+1} \times (1 + 0.0005)$.
+
+### Rule 4 — Whitelist Rotation & T+2 Settlement Discipline
+When a stock rotates off the whitelist at a 15-day rebalance boundary:
+1. All unfilled buy limit orders are cancelled immediately.
+2. Legally cleared shares ($T+2$ settled) are liquidated at market close on rotation day.
+3. Pending clearance shares are held until legal settlement and liquidated at the opening auction on their settlement morning ($T+2.5$).
+
+### Rule 5 — Emergency Floor Stop Architecture
+To guard against severe regime breaks, an emergency floor stop is placed 2 buffer levels ($N_{\text{buffer}} = 2$) below the deepest active grid level ($N = 16$):
+$$
+P_{\text{floor}} = A_0 \cdot \big(1 - (N + N_{\text{buffer}}) \cdot \Delta\big) = A_0 \cdot \big(1 - (16 + 2) \times 0.020\big) = 0.640 \cdot A_0
+$$
+
+> [!NOTE]
+> **Active Grid Levels ($N=16$) vs. Emergency Floor ($N+2=18$)**:
+> The operational trading grid consists of **$N = 16$ active buy levels** at **$\Delta = 2.0\%$ spacing** (covering a total depth of $16 \times 2.0\% = 32.0\%$ below the anchor). The number $18$ in the floor stop formula represents the 16 active levels plus a 2-level buffer interval ($16 + 2 = 18$ intervals, or $-36.0\%$ from anchor). If price breaches $P_{\text{floor}}$, all buying ceases and inventory is liquidated upon $T+2$ clearance.
+
+### Rule 6 — Period-End Mark-to-Market Accounting
+Unsold inventory at backtest termination is marked to market at the final bar's closing price without artificial liquidation. Realized harvest PnL, rotation drag, open inventory value, and unrealized PnL are reported explicitly.
 
 ---
 
@@ -290,7 +342,13 @@ For visual demonstrations and defense slides, the following figures and explorat
 
 1. **Candlestick Limit Execution Overlay** (`python visualize_price_grid_overlay.py`):
    ![Grid Price Overlay](images/grid_price_overlay_demonstration.png)
-   *Demonstrates 50-SMA anchor, geometric limit buys, take-profit executions, and rotation exits against HOSE 30-minute candlestick prints.*
+   *Figure: Deployed strategy ($N=16$ geometric levels, $\Delta=2.0\%$ spacing) executing on CTG during Out-of-Sample (June–August 2024). Demonstrates 50-SMA central anchor ($A_0$), limit buy fills (green triangles), take-profit executions (blue circles), rotation exits (amber diamonds), floor stop line ($0.640 \cdot A_0$), and active share inventory oscillations (lower panel) capturing $+4,140,872\text{ VND}$ in realized harvest profit.*
+
+> [!TIP]
+> **Why Deployed Parameters Are $N=16$ Levels and $\Delta=2.0\%$ Spacing**:
+> - **Early Baseline ($N=18, \Delta=1.8\%$)**: Configured as an unoptimized starting point in `config/config.yaml` to evaluate conservative channel coverage ($18 \times 1.8\% = 32.4\%$).
+> - **Optimization Selection ($N=16, \Delta=2.0\%$)**: In-Sample Calmar surface optimization evaluated $N \in [12..20]$ and $\Delta \in [0.5\%..2.0\%]$. Moving to $N=16, \Delta=2.0\%$ yielded the global constrained peak (Calmar $0.663$ vs. $0.437$ baseline, $+7.76\%$ return, $-4.16\%$ MDD).
+> - **Consistent Deployment**: These optimized parameters are saved in `config/best_params.yaml` and deployed across Out-of-Sample (2024), 2025 Bull Test, 2026 Holdout, and the visualization script. The number $18$ appears solely as the emergency floor trigger depth ($16 \text{ levels} + 2 \text{ buffer levels} = 18$).
 
 2. **Kaufman ER Roundtrip Analysis** (`python analyze_er_roundtrips.py`):
    ![ER Roundtrip Comparison](images/er_roundtrip_comparison.png)

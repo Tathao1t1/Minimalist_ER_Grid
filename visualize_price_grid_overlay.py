@@ -14,7 +14,7 @@ if curr_dir not in sys.path:
 from src.data_fetcher import prepare_data
 from src.logic import MinimalistERGridBacktest
 
-def plot_ticker_grid_overlay(ticker, split="out_sample", start_date="2024-10-15", end_date="2024-12-15"):
+def plot_ticker_grid_overlay(ticker="CTG", split="out_sample", start_date="2024-06-15", end_date="2024-08-10"):
     cfg_path = os.path.join(curr_dir, "config/config.yaml")
     with open(cfg_path, "r") as f:
         config = yaml.safe_load(f)
@@ -24,7 +24,7 @@ def plot_ticker_grid_overlay(ticker, split="out_sample", start_date="2024-10-15"
         with open(best_params_path, "r") as f:
             best_cfg = yaml.safe_load(f)
         opt_strat = best_cfg.get("strategy", {})
-        for k in ["selection_lookback", "selection_rebalance_days", "n_levels", "grid_spacing_pct"]:
+        for k in ["selection_lookback", "selection_rebalance_days", "n_levels", "grid_spacing_pct", "stop_buffer_levels"]:
             if k in opt_strat:
                 strat_cfg[k] = opt_strat[k]
     
@@ -57,11 +57,13 @@ def plot_ticker_grid_overlay(ticker, split="out_sample", start_date="2024-10-15"
                            
     # Compute representative anchor and grid levels during active deployment
     active_anchor = sub_bars["sma50"].dropna().iloc[10] if len(sub_bars["sma50"].dropna()) > 10 else sub_bars["close"].mean()
-    spacing = active_anchor * strat_cfg.get("grid_spacing_pct", 0.018)
-    n_levels = strat_cfg.get("n_levels", 18)
+    spacing_pct = float(strat_cfg.get("grid_spacing_pct", 0.02))
+    spacing = active_anchor * spacing_pct
+    n_levels = int(strat_cfg.get("n_levels", 16))
+    stop_buffer = int(strat_cfg.get("stop_buffer_levels", 2))
     levels = [round(active_anchor - k * spacing, 2) for k in range(1, n_levels + 1)]
     tps = [round(active_anchor - (k - 1) * spacing, 2) for k in range(1, n_levels + 1)]
-    floor_stop = active_anchor - (n_levels + strat_cfg.get("stop_buffer_levels", 2)) * spacing
+    floor_stop = active_anchor - (n_levels + stop_buffer) * spacing
     
     # Create high-resolution plot
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 10), gridspec_kw={"height_ratios": [3.2, 1.2]}, sharex=True)
@@ -87,26 +89,40 @@ def plot_ticker_grid_overlay(ticker, split="out_sample", start_date="2024-10-15"
     # Plot Trade Executions
     if len(ticker_trades) > 0:
         ax1.scatter(ticker_trades["entry_ts"], ticker_trades["entry_price"], 
-                    marker="^", color="#059669", s=70, edgecolors="#064E3B", linewidth=1.2, label=f"Buy Limit Fills ({len(ticker_trades)})", zorder=6)
-        ax1.scatter(ticker_trades["exit_ts"], ticker_trades["exit_price"], 
-                    marker="o", color="#2563EB", s=60, edgecolors="#1E3A8A", linewidth=1.2, label=f"Take Profit Exits ({len(ticker_trades)})", zorder=6)
+                    marker="^", color="#059669", s=75, edgecolors="#064E3B", linewidth=1.2, label=f"Buy Limit Fills ({len(ticker_trades)})", zorder=6)
         
-        # Connect Entries to Exits with subtle green lines
+        tp_trades = ticker_trades[ticker_trades["reason"] == "target"]
+        rot_trades = ticker_trades[ticker_trades["reason"] != "target"]
+        
+        if len(tp_trades) > 0:
+            ax1.scatter(tp_trades["exit_ts"], tp_trades["exit_price"], 
+                        marker="o", color="#2563EB", s=65, edgecolors="#1E3A8A", linewidth=1.2, label=f"Take Profit Exits ({len(tp_trades)})", zorder=6)
+        if len(rot_trades) > 0:
+            ax1.scatter(rot_trades["exit_ts"], rot_trades["exit_price"], 
+                        marker="D", color="#D97706", s=60, edgecolors="#78350F", linewidth=1.2, label=f"Rotation Exits ({len(rot_trades)})", zorder=6)
+        
+        # Connect Entries to Exits
         for _, tr in ticker_trades.iterrows():
-            ax1.plot([tr["entry_ts"], tr["exit_ts"]], [tr["entry_price"], tr["exit_price"]], color="#10B981", linestyle="-", linewidth=0.8, alpha=0.6, zorder=3)
+            conn_color = "#10B981" if tr["reason"] == "target" else "#F59E0B"
+            ax1.plot([tr["entry_ts"], tr["exit_ts"]], [tr["entry_price"], tr["exit_price"]], color=conn_color, linestyle="-", linewidth=0.9, alpha=0.6, zorder=3)
             
-    ax1.set_title(f"Minimalist Kaufman ER Grid Execution Overlay: {ticker} (18 Geometric Levels, 1.8% Spacing)", fontsize=14, fontweight="bold", pad=12)
+    ax1.set_title(f"Minimalist Kaufman ER Grid Execution Overlay: {ticker} ({n_levels} Geometric Levels, {spacing_pct*100:.1f}% Spacing)", fontsize=14, fontweight="bold", pad=12)
     ax1.set_ylabel("Price (VND)", fontsize=11, fontweight="bold")
     ax1.grid(True, linestyle=":", alpha=0.4)
-    ax1.legend(loc="upper left", framealpha=0.92, fontsize=9.5)
+    ax1.legend(loc="upper left", framealpha=0.92, fontsize=9.0)
     
     # Text Annotation Box
     total_pnl = ticker_trades["pnl"].sum() if len(ticker_trades) > 0 else 0
+    tp_count = len(ticker_trades[ticker_trades["reason"] == "target"]) if len(ticker_trades) > 0 else 0
+    rot_count = len(ticker_trades[ticker_trades["reason"] != "target"]) if len(ticker_trades) > 0 else 0
+    win_count = len(ticker_trades[ticker_trades["pnl"] > 0]) if len(ticker_trades) > 0 else 0
+    win_rate = (win_count / len(ticker_trades) * 100) if len(ticker_trades) > 0 else 0.0
+    
     box_text = (
         f"Ticker: {ticker} (HOSE T+2.5)\n"
-        f"Grid Levels: {n_levels} Levels @ 1.8%\n"
-        f"Closed Trades: {len(ticker_trades)}\n"
-        f"Win Rate: 100.0%\n"
+        f"Grid Levels: {n_levels} Levels @ {spacing_pct*100:.1f}%\n"
+        f"Closed Trades: {len(ticker_trades)} ({tp_count} TP, {rot_count} Rot)\n"
+        f"Win Rate: {win_rate:.1f}%\n"
         f"Harvest PnL: +{total_pnl:,.0f} VND"
     )
     ax1.text(0.985, 0.04, box_text, transform=ax1.transAxes, fontsize=9.5, verticalalignment="bottom", horizontalalignment="right",
@@ -134,4 +150,8 @@ def plot_ticker_grid_overlay(ticker, split="out_sample", start_date="2024-10-15"
     print(f"Successfully generated grid price overlay at: {out_path}")
 
 if __name__ == "__main__":
-    plot_ticker_grid_overlay("HDB", split="out_sample", start_date="2024-10-20", end_date="2024-12-15")
+    t = sys.argv[1] if len(sys.argv) > 1 else "CTG"
+    s = sys.argv[2] if len(sys.argv) > 2 else "out_sample"
+    start = sys.argv[3] if len(sys.argv) > 3 else "2024-06-15"
+    end = sys.argv[4] if len(sys.argv) > 4 else "2024-08-10"
+    plot_ticker_grid_overlay(ticker=t, split=s, start_date=start, end_date=end)
