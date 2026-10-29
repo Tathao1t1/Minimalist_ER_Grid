@@ -1,0 +1,12 @@
+{
+  "in_sample_bars": 192886,
+  "out_of_sample_bars": 67428,
+  "test_2025_bars": 66244,
+  "holdout_bars": 46203,
+  "is_median_daily_hl_range": 0.03135,
+  "spacing_bounds": [
+    0.005,
+    0.02
+  ],
+  "status": "verified"
+}
