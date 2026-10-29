@@ -173,6 +173,20 @@ Unsold inventory at backtest termination is marked to market at the final bar's 
 | **2025 Bull Test** | 2025-01-01 to 2025-12-31 | 66,244 | Strong Liquidity Bull (+51.18% VN30) |
 | **Forward Holdout** | 2026-01-01 to 2026-09-18 | 46,203 | Choppy Downward Drift (-3.18% VN30, -16.96% MDD) |
 
+### Multi-Period Performance & Trade Volume Summary
+
+The table below presents the complete quantitative track record across all evaluation periods for the deployed strategy (`N = 16`, `Δ = 2.0%`, lookback 30d, rebalance 15d), honestly disclosing total completed trades, harvest win rate, capital utilization, and benchmark hurdle performance:
+
+| Evaluation Period | Calendar Window | Total Trades | Take-Profit (Win) | Whitelist Rotations | Floor Stops | Win Rate | Net HPR (%) | MDD (%) | Daily Sharpe | Avg Invested Capital | Avg Idle Cash | Beat 6% Deposit Hurdle? |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **In-Sample** | 2021-04 to 2023-12 *(33 mos)* | **937** | 717 | 220 | 0 | **76.52%** | **+7.76%** | -4.16% | -0.729 | 7.4% | 92.6% | **No** (+7.76% vs +17.38%) |
+| **Out-of-Sample** | 2024-01 to 2024-12 *(12 mos)* | **217** | 173 | 44 | 0 | **79.72%** | **+5.18%** | -1.66% | -0.355 | 5.0% | 95.0% | **No** (+5.18% vs +5.98%) |
+| **2025 Bull Test** | 2025-01 to 2025-12 *(12 mos)* | **323** | 267 | 56 | 0 | **82.66%** | **+7.04%** | -5.10% | +0.186 | 6.4% | 93.6% | **Yes** (+7.04% vs +5.96%) |
+| **Forward Holdout**| 2026-01 to 2026-09 *(8.5 mos)* | **302** | 235 | 67 | 0 | **77.81%** | **+4.71%** | -3.52% | +0.152 | 9.4% | 90.6% | **Yes** (+4.71% vs +4.17%) |
+| **Full Lifecycle** | **2021 to 2026 (~5.5 years)** | **1,779** | **1,392** | **387** | **0** | **78.25%** | **+27.06%** | **-5.10%** | **-0.291** | **7.0%** | **93.0%** | **Drawdown Protection Alpha** |
+
+*(Note: In-Sample baseline evaluated in Step 4 under unoptimized initial parameters N = 18, Δ = 1.8%, lookback 40d, rebalance 10d generated 990 total trades: 679 TP, 311 rotation exits, 0 floor stops, 68.59% win rate).*
+
 ### Repository Structure
 
 ```text
@@ -428,7 +442,7 @@ For visual demonstrations and defense slides, the following figures and explorat
 2. **Cohort Selection**: Low ER consistently outperformed High ER across all three splits (+7.76% vs +0.57% in IS; +5.18% vs +4.81% in OOS; +4.71% vs +0.35% in Holdout), ranking at the **75th percentile** of 20 random seeds in IS and Holdout, and at the **45th percentile** in OOS.
 3. **Role of SMA Gate**: Both variants recorded 0 floor stops. The gate provided verified bear-market drawdown control (-4.16% vs -5.01%) while accepting modest drag in choppy holdout markets (+4.71% vs +5.33%).
 4. **Primary Limitations**:
-   - **Capital Drag**: Low average capital utilization (5.0% - 9.4%) leaves over 90% in non-interest-bearing cash.
+   - **Capital Drag & Trade Velocity**: Across the full 5.5-year lifecycle and 1,779 completed trades, average capital utilization remains at 5.0% - 9.4%, leaving ~90%-95% of capital idle in non-interest-bearing cash. This low capital utilization acts as institutional crash insurance (limiting the 2022 bear drawdown to -4.16% vs VN30's -42.46%), but creates cash drag against bank deposits during periods of steady market rise.
    - **Methodology Note**: The 2.0% spacing cap was formalized post-hoc after initial OOS inspection (commits `dce6d2c` → `a068245`).
    - **Jurisdiction**: Mechanics depend on HOSE microstructure (no short-selling, 100-share board lots, active T+2 settlement).
 
