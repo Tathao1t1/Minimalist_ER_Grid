@@ -8,7 +8,7 @@ from .data_fetcher import prepare_data
 def run_optimization(config):
     """
     Exhaustive 25-Point Grid Search Hyperparameter Optimization.
-    Evaluates combinations of N in [12, 14, 16, 18, 20] and Spacing in [1.6%, 3.2%]
+    Evaluates combinations of N in [12, 14, 16, 18, 20] and Spacing in [0.5%, 2.0%]
     using In-Sample optimal lookback=30d, rebalance=15d strictly on In-Sample (2021-2023)
     using institutional Calmar Ratio and Daily Sharpe.
     """

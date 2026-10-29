@@ -24,11 +24,11 @@ strategy:
   capital: 1000000000
   initial_spot_capital: 1000000000
   top_k: 4
-  selection_lookback: 40
-  selection_rebalance_days: 10
+  selection_lookback: 30
+  selection_rebalance_days: 15
   trend_filter: "none"
-  n_levels: 18
-  grid_spacing_pct: 0.018
+  n_levels: 16
+  grid_spacing_pct: 0.020
   stop_buffer_levels: 2
   broker_fee: 0.0015
   sell_tax: 0.0010

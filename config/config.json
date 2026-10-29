@@ -22,30 +22,7 @@
         "slippage_bps": 5,
         "risk_free_rate": 0.06
     },
-    "in_sample_baseline_performance": {
-        "period": "2021-04 to 2023-12",
-        "parameters": "lookback=40d, rebalance=10d, n_levels=18, spacing=0.018",
-        "total_trades": 990,
-        "tp_trades": 679,
-        "rotation_trades": 311,
-        "floor_stop_trades": 0,
-        "win_rate": 0.6859,
-        "net_profit_vnd": 15477951,
-        "total_return": 0.0155,
-        "cagr": 0.0057,
-        "max_drawdown": -0.0409,
-        "daily_sharpe": -1.657,
-        "calmar_ratio": 0.139,
-        "benchmark_return": -0.1142,
-        "excess_return": 0.1297,
-        "beta": 0.077,
-        "average_invested_capital_pct": 0.062,
-        "spot_harvest_pnl_vnd": 158271888,
-        "rotation_pnl_vnd": -142793936,
-        "hurdle_6pct_return": 0.1738,
-        "beat_hurdle": false
-    },
-    "in_sample_optimized_performance": {
+    "in_sample_performance": {
         "period": "2021-04 to 2023-12",
         "parameters": "lookback=30d, rebalance=15d, n_levels=16, spacing=0.020",
         "total_trades": 937,
