@@ -2,9 +2,10 @@ import os
 import sys
 import yaml
 
-curr_dir = os.path.dirname(os.path.abspath(__file__))
-if curr_dir not in sys.path:
-    sys.path.insert(0, curr_dir)
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+curr_dir = repo_root
 
 try:
     import plutus_verify as pv
@@ -26,7 +27,7 @@ from src.logic import MinimalistERGridBacktest, plot_equity_curve
 
 def main():
     print("=" * 75)
-    print("MINIMALIST ER SPOT GRID — 2025 BULL REGIME EVALUATION")
+    print("MINIMALIST ER SPOT GRID — OUT-OF-SAMPLE EVALUATION (2024)")
     print("=" * 75)
     
     cfg_path = os.path.join(curr_dir, "config/config.yaml")
@@ -46,7 +47,7 @@ def main():
     else:
         print(f"Using default parameters from config.yaml: lookback={strat_cfg.get('selection_lookback', 40)}d, rebalance={strat_cfg.get('selection_rebalance_days', 10)}d, n_levels={strat_cfg.get('n_levels', 18)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.018)}")
         
-    bundle = prepare_data(config, "test_2025", include_warmup=True)
+    bundle = prepare_data(config, "out_sample")
     
     sim = MinimalistERGridBacktest(
         capital=strat_cfg.get("capital", 1_000_000_000),
@@ -104,7 +105,7 @@ def main():
     print("Note: Open inventory is marked to market at period-end close; no artificial forced liquidation.")
     print("=" * 75)
 
-    with pv.step("test_2025") as r:
+    with pv.step("out_of_sample") as r:
         r.metric("hpr", float(round(res["hpr"] / 100.0, 4)), unit="fraction")
         r.metric("annual_return", float(round(res["annual_return"] / 100.0, 4)), unit="fraction")
         r.metric("max_drawdown", float(round(abs(res["max_drawdown"]) / 100.0, 4)), unit="fraction")
@@ -120,11 +121,11 @@ def main():
         r.metric("open_inventory_value", float(round(res["open_inventory_value"], 0)), unit="ratio")
         r.metric("unrealized_pnl", float(round(res["unrealized_pnl"], 0)), unit="ratio")
         
-        chart_path = "images/equity_curve_2025.png"
+        chart_path = "images/equity_curve_out_sample.png"
         plot_equity_curve(
             res["equity_series"],
             strat_cfg.get("capital", 1_000_000_000),
-            "Minimalist ER Spot Grid — Equity vs VN30 Benchmark [2025 BULL REGIME]",
+            "Minimalist ER Spot Grid — Equity vs VN30 Benchmark [OUT OF SAMPLE (2024)]",
             os.path.join(curr_dir, chart_path),
             bmk_series=res.get("benchmark_series")
         )

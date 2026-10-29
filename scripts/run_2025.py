@@ -2,9 +2,10 @@ import os
 import sys
 import yaml
 
-curr_dir = os.path.dirname(os.path.abspath(__file__))
-if curr_dir not in sys.path:
-    sys.path.insert(0, curr_dir)
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+curr_dir = repo_root
 
 try:
     import plutus_verify as pv
@@ -26,7 +27,7 @@ from src.logic import MinimalistERGridBacktest, plot_equity_curve
 
 def main():
     print("=" * 75)
-    print("MINIMALIST ER SPOT GRID — IN-SAMPLE BASELINE EVALUATION (2021-2023)")
+    print("MINIMALIST ER SPOT GRID — 2025 BULL REGIME EVALUATION")
     print("=" * 75)
     
     cfg_path = os.path.join(curr_dir, "config/config.yaml")
@@ -34,11 +35,19 @@ def main():
         config = yaml.safe_load(f)
         
     strat_cfg = config.get("strategy", {})
-    # Step 4 evaluates the baseline strategy hypothesis from config.yaml directly.
-    # It strictly avoids forward dependency on optimization outputs (Step 5).
-    print(f"Evaluating baseline parameters from config.yaml: lookback={strat_cfg.get('selection_lookback', 40)}d, rebalance={strat_cfg.get('selection_rebalance_days', 10)}d, n_levels={strat_cfg.get('n_levels', 18)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.018)}")
-
-    bundle = prepare_data(config, "in_sample")
+    best_params_path = os.path.join(curr_dir, "config/best_params.yaml")
+    if os.path.exists(best_params_path):
+        with open(best_params_path, "r") as f:
+            best_cfg = yaml.safe_load(f)
+        opt_strat = best_cfg.get("strategy", {})
+        for k in ["selection_lookback", "selection_rebalance_days", "n_levels", "grid_spacing_pct"]:
+            if k in opt_strat:
+                strat_cfg[k] = opt_strat[k]
+        print(f"Piping parameters from config/best_params.yaml: lookback={strat_cfg.get('selection_lookback')}d, rebalance={strat_cfg.get('selection_rebalance_days')}d, n_levels={strat_cfg['n_levels']}, grid_spacing_pct={strat_cfg['grid_spacing_pct']}")
+    else:
+        print(f"Using default parameters from config.yaml: lookback={strat_cfg.get('selection_lookback', 40)}d, rebalance={strat_cfg.get('selection_rebalance_days', 10)}d, n_levels={strat_cfg.get('n_levels', 18)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.018)}")
+        
+    bundle = prepare_data(config, "test_2025", include_warmup=True)
     
     sim = MinimalistERGridBacktest(
         capital=strat_cfg.get("capital", 1_000_000_000),
@@ -46,11 +55,11 @@ def main():
         broker_fee=strat_cfg.get("broker_fee", 0.0015),
         sell_tax=strat_cfg.get("sell_tax", 0.0010),
         slippage=strat_cfg.get("slippage", 0.0005),
-        selection_lookback=strat_cfg.get("selection_lookback", 40),
-        selection_rebalance_days=strat_cfg.get("selection_rebalance_days", 10),
+        selection_lookback=strat_cfg.get("selection_lookback", 30),
+        selection_rebalance_days=strat_cfg.get("selection_rebalance_days", 15),
         top_k=strat_cfg.get("top_k", 4),
-        n_levels=strat_cfg.get("n_levels", 18),
-        grid_spacing_pct=strat_cfg.get("grid_spacing_pct", 0.018),
+        n_levels=strat_cfg.get("n_levels", 16),
+        grid_spacing_pct=strat_cfg.get("grid_spacing_pct", 0.028),
         stop_buffer_levels=strat_cfg.get("stop_buffer_levels", 2),
         trend_filter=strat_cfg.get("trend_filter", "none"),
         risk_free_rate=strat_cfg.get("risk_free_rate", 0.06)
@@ -69,7 +78,7 @@ def main():
     print(f"VN30 Benchmark HPR:           {res['benchmark_hpr']:+.2f}%")
     print(f"VN30 Benchmark MDD:           {res['benchmark_mdd']:.2f}%")
     print(f"Strategy Excess Return:       {res['excess_return']:+.2f}%")
-    print(f"Market Beta:                  {res['beta']:.3f} (Low systematic exposure)")
+    print(f"Market Beta:                  {res['beta']:.3f} (Ultra-low systematic exposure)")
     print(f"Annualized Jensen's Alpha:    {res['alpha']:+.2f}%")
     print(f"Average Capital Invested:     {res['avg_capital_invested_pct']:.1f}% ({100-res['avg_capital_invested_pct']:.1f}% Cash)")
     print("-" * 75)
@@ -96,7 +105,7 @@ def main():
     print("Note: Open inventory is marked to market at period-end close; no artificial forced liquidation.")
     print("=" * 75)
 
-    with pv.step("in_sample") as r:
+    with pv.step("test_2025") as r:
         r.metric("hpr", float(round(res["hpr"] / 100.0, 4)), unit="fraction")
         r.metric("annual_return", float(round(res["annual_return"] / 100.0, 4)), unit="fraction")
         r.metric("max_drawdown", float(round(abs(res["max_drawdown"]) / 100.0, 4)), unit="fraction")
@@ -112,11 +121,11 @@ def main():
         r.metric("open_inventory_value", float(round(res["open_inventory_value"], 0)), unit="ratio")
         r.metric("unrealized_pnl", float(round(res["unrealized_pnl"], 0)), unit="ratio")
         
-        chart_path = "images/equity_curve_in_sample.png"
+        chart_path = "images/equity_curve_2025.png"
         plot_equity_curve(
             res["equity_series"],
             strat_cfg.get("capital", 1_000_000_000),
-            "Minimalist ER Spot Grid — Equity vs VN30 Benchmark [IN SAMPLE BASELINE (2021-2023)]",
+            "Minimalist ER Spot Grid — Equity vs VN30 Benchmark [2025 BULL REGIME]",
             os.path.join(curr_dir, chart_path),
             bmk_series=res.get("benchmark_series")
         )

@@ -3,10 +3,11 @@ import sys, os, yaml
 import pandas as pd
 import numpy as np
 
-curr_dir = os.path.dirname(os.path.abspath(__file__))
-strat_dir = curr_dir
-if strat_dir not in sys.path:
-    sys.path.insert(0, strat_dir)
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+strat_dir = repo_root
+curr_dir = repo_root
 
 from src.data_fetcher import prepare_data
 from src.logic import MinimalistERGridBacktest

@@ -23,7 +23,7 @@ steps:
     nine_step: step_2_data_preparation
     required: true
     network: none
-    command: "python run_data_prep.py"
+    command: "python scripts/run_data_prep.py"
     outputs:
       - "data/data_summary.json"
 
@@ -31,7 +31,7 @@ steps:
     nine_step: step_4_in_sample
     required: true
     network: none
-    command: "python run_is.py"
+    command: "python scripts/run_is.py"
     depends_on:
       - data_preparation
     outputs:
@@ -41,7 +41,7 @@ steps:
     nine_step: step_5_optimization
     required: true
     network: none
-    command: "python run_optimization.py"
+    command: "python scripts/run_optimization.py"
     depends_on:
       - in_sample
     outputs:
@@ -52,7 +52,7 @@ steps:
     nine_step: step_6_out_of_sample
     required: true
     network: none
-    command: "python run_oos.py"
+    command: "python scripts/run_oos.py"
     depends_on:
       - optimization
     outputs:
@@ -62,7 +62,7 @@ steps:
     nine_step: step_6_out_of_sample
     required: true
     network: none
-    command: "python run_2025.py"
+    command: "python scripts/run_2025.py"
     depends_on:
       - optimization
     outputs:
@@ -72,7 +72,7 @@ steps:
     nine_step: step_7_paper_trading
     required: true
     network: none
-    command: "python run_holdout.py"
+    command: "python scripts/run_holdout.py"
     depends_on:
       - out_of_sample
     outputs:

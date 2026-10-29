@@ -173,6 +173,48 @@ Unsold inventory at backtest termination is marked to market at the final bar's 
 | **2025 Bull Test** | 2025-01-01 to 2025-12-31 | 66,244 | Strong Liquidity Bull (+51.18% VN30) |
 | **Forward Holdout** | 2026-01-01 to 2026-09-18 | 46,203 | Choppy Downward Drift (-3.18% VN30, -16.96% MDD) |
 
+### Repository Structure
+
+```text
+Minimalist_ER_Grid/
+├── .plutus/
+│   └── manifest.yaml               # Plutus 9-step reproducible quantitative manifest
+├── config/
+│   ├── best_params.yaml            # Deployed optimal parameters (N=16, Δ=2.0%)
+│   ├── config.json                 # Comprehensive strategy summary & metadata
+│   ├── config.yaml                 # Baseline backtest & market fee specifications
+│   └── grid_spacing_bounds.yaml    # Objective In-Sample volatility spacing bounds
+├── data/
+│   ├── corporate_actions/          # Split & dividend adjustment factors
+│   ├── processed/                  # Continuous 30m OHLCV bar feeds
+│   └── raw/                        # Raw historical VN30 data
+├── images/                         # Generated equity curves & diagnostic charts
+├── research/                       # Extended hedge, scale, and thesis diagnosis scripts
+│   ├── HEDGE_AND_SCALE_REPORT.md
+│   ├── run_inventory_hedge_scale_study.py
+│   ├── run_signal_role_diagnosis.py
+│   └── test_model_b_dual_horizon.py
+├── results/                        # Optimization surface CSVs & backtest outputs
+├── scripts/                        # Production pipeline & diagnostic runners
+│   ├── analyze_er_roundtrips.py    # Kaufman ER roundtrip & velocity analyzer
+│   ├── run_2025.py                 # Step 6b: 2025 bull regime evaluation
+│   ├── run_benchmark_ablation.py   # Empirical benchmark ablation (20 seeds)
+│   ├── run_data_prep.py            # Step 2: Data preparation & schema integrity
+│   ├── run_holdout.py              # Step 7: Forward holdout evaluation (2026)
+│   ├── run_is.py                   # Step 4: In-Sample baseline backtesting
+│   ├── run_oos.py                  # Step 6a: Out-of-Sample backtesting (2024)
+│   ├── run_optimization.py         # Step 5: Exhaustive grid optimization
+│   ├── sweep_lookback_rebalance.py # In-Sample lookback x rebalance sweep
+│   └── visualize_price_grid_overlay.py # Microstructure limit fill overlay
+├── src/                            # Core quantitative execution engine
+│   ├── data_fetcher.py             # Data loading, adjustments, and warmup prep
+│   ├── driver.py                   # Unified CLI driver
+│   ├── logic.py                    # Vectorized HOSE T+2.5 grid engine
+│   └── optimizer.py                # Calmar surface optimization engine
+├── requirements.txt                # Pinned production dependencies
+└── README.md                       # Quantitative report & verification guide
+```
+
 ### Quickstart Execution Guide
 
 ```bash
@@ -184,18 +226,18 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 2. Verify data preparation
-python run_data_prep.py
+python scripts/run_data_prep.py
 
 # 3. Execute backtest pipeline in manifest order
-python run_is.py
-python run_optimization.py
-python run_oos.py
-python run_2025.py
-python run_holdout.py
+python scripts/run_is.py
+python scripts/run_optimization.py
+python scripts/run_oos.py
+python scripts/run_2025.py
+python scripts/run_holdout.py
 
 # 4. Optional: run ablation and sensitivity sweeps
-python sweep_lookback_rebalance.py
-python run_benchmark_ablation.py
+python scripts/sweep_lookback_rebalance.py
+python scripts/run_benchmark_ablation.py
 ```
 
 ---
@@ -203,7 +245,7 @@ python run_benchmark_ablation.py
 ## In-Sample Baseline Backtesting (2021–2023)
 
 ```bash
-python run_is.py
+python scripts/run_is.py
 ```
 
 Evaluates baseline parameters (`N = 18`, `Δ = 1.8%`, lookback 40d, rebalance 10d) from `config/config.yaml`.
@@ -234,7 +276,7 @@ Evaluates baseline parameters (`N = 18`, `Δ = 1.8%`, lookback 40d, rebalance 10
 ## Hyperparameter Optimization
 
 ```bash
-python run_optimization.py
+python scripts/run_optimization.py
 ```
 
 The optimization is conducted **sequentially** strictly on In-Sample data (2021–2023):
@@ -270,7 +312,7 @@ For complete research transparency, the full exploratory surface from 0.5% to 4.
 ## Out-of-Sample Backtesting (2024)
 
 ```bash
-python run_oos.py
+python scripts/run_oos.py
 ```
 
 | Metric | Plutus Expected | Verified Result | Plutus Tolerance | Status |
@@ -298,7 +340,7 @@ python run_oos.py
 ## 2025 Bull Regime Evaluation
 
 ```bash
-python run_2025.py
+python scripts/run_2025.py
 ```
 
 | Metric | Verified Value | Macro Context |
@@ -325,7 +367,7 @@ python run_2025.py
 ## Forward Holdout Evaluation (2026)
 
 ```bash
-python run_holdout.py
+python scripts/run_holdout.py
 ```
 
 | Metric | Plutus Expected | Verified Result | Plutus Tolerance | Status |
@@ -355,7 +397,7 @@ python run_holdout.py
 
 For visual demonstrations and defense slides, the following figures and exploratory scripts are available in the repository:
 
-1. **Candlestick Limit Execution Overlay** (`python visualize_price_grid_overlay.py`):
+1. **Candlestick Limit Execution Overlay** (`python scripts/visualize_price_grid_overlay.py`):
    ![Grid Price Overlay](images/grid_price_overlay_demonstration.png)
    *Figure: Deployed strategy (N = 16 geometric levels, Δ = 2.0% spacing) executing on CTG during Out-of-Sample (June–August 2024). Demonstrates 50-SMA central anchor (A_0), limit buy fills (green triangles), take-profit executions (blue circles), rotation exits (amber diamonds), floor stop line (0.640 × A_0), and active share inventory oscillations (lower panel) capturing +4,140,872 VND in realized harvest profit.*
 
@@ -365,7 +407,7 @@ For visual demonstrations and defense slides, the following figures and explorat
 > - **Optimization Selection (N = 16, Δ = 2.0%)**: In-Sample Calmar surface optimization evaluated N in `[12..20]` and Δ in `[0.5%..2.0%]`. Moving to N = 16, Δ = 2.0% yielded the global constrained peak (Calmar 0.663 vs. 0.437 baseline, +7.76% return, -4.16% MDD).
 > - **Consistent Deployment**: These optimized parameters are saved in `config/best_params.yaml` and deployed across Out-of-Sample (2024), 2025 Bull Test, 2026 Holdout, and the visualization script. The number 18 appears solely as the emergency floor trigger depth (16 active levels + 2 buffer levels = 18).
 
-2. **Kaufman ER Roundtrip Analysis** (`python analyze_er_roundtrips.py`):
+2. **Kaufman ER Roundtrip Analysis** (`python scripts/analyze_er_roundtrips.py`):
    ![ER Roundtrip Comparison](images/er_roundtrip_comparison.png)
    *Confirms that Low-ER stocks execute significantly higher take-profit oscillations than High-ER trending stocks.*
 
