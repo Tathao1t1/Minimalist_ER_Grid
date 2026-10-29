@@ -98,31 +98,31 @@ expected:
   - step_id: in_sample
     metrics:
       - name: hpr
-        value: 0.0776
+        value: -0.1183
         tolerance: {kind: relative, value: 0.05}
       - name: annual_return
-        value: 0.0276
+        value: -0.0448
         tolerance: {kind: relative, value: 0.05}
       - name: max_drawdown
-        value: 0.0416
+        value: 0.1600
         tolerance: {kind: relative, value: 0.05}
       - name: daily_sharpe
-        value: -0.729
+        value: -1.482
         tolerance: {kind: absolute, value: 0.15}
       - name: calmar_ratio
-        value: 0.663
+        value: -0.280
         tolerance: {kind: absolute, value: 0.05}
       - name: win_rate
-        value: 0.7652
+        value: 0.7879
         tolerance: {kind: relative, value: 0.05}
       - name: total_trades
-        value: 937
+        value: 2239
         tolerance: {kind: exact, value: 0}
       - name: tp_trades
-        value: 717
+        value: 1764
         tolerance: {kind: exact, value: 0}
       - name: stop_episodes
-        value: 0
+        value: 19
         tolerance: {kind: exact, value: 0}
       - name: open_inventory_value
         value: 0.0

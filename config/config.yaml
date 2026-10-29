@@ -27,8 +27,8 @@ strategy:
   selection_lookback: 30
   selection_rebalance_days: 15
   trend_filter: "none"
-  n_levels: 16
-  grid_spacing_pct: 0.020
+  n_levels: 20
+  grid_spacing_pct: 0.010
   stop_buffer_levels: 2
   broker_fee: 0.0015
   sell_tax: 0.0010

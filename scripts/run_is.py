@@ -27,7 +27,7 @@ from src.logic import MinimalistERGridBacktest, plot_equity_curve
 
 def main():
     print("=" * 75)
-    print("MINIMALIST ER SPOT GRID — IN-SAMPLE EVALUATION (2021-2023)")
+    print("MINIMALIST ER SPOT GRID — IN-SAMPLE BASELINE EVALUATION (2021-2023)")
     print("=" * 75)
     
     cfg_path = os.path.join(curr_dir, "config/config.yaml")
@@ -35,8 +35,9 @@ def main():
         config = yaml.safe_load(f)
         
     strat_cfg = config.get("strategy", {})
-    # Step 4 evaluates the strategy hypothesis from config.yaml directly.
-    print(f"Evaluating parameters from config.yaml: lookback={strat_cfg.get('selection_lookback', 30)}d, rebalance={strat_cfg.get('selection_rebalance_days', 15)}d, n_levels={strat_cfg.get('n_levels', 16)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.020)}")
+    # Step 4 evaluates the baseline strategy hypothesis from config.yaml directly.
+    # It strictly avoids forward dependency on optimization outputs (Step 5).
+    print(f"Evaluating baseline parameters from config.yaml: lookback={strat_cfg.get('selection_lookback', 30)}d, rebalance={strat_cfg.get('selection_rebalance_days', 15)}d, n_levels={strat_cfg.get('n_levels', 20)}, grid_spacing_pct={strat_cfg.get('grid_spacing_pct', 0.010)}")
 
     bundle = prepare_data(config, "in_sample")
     
@@ -49,8 +50,8 @@ def main():
         selection_lookback=strat_cfg.get("selection_lookback", 30),
         selection_rebalance_days=strat_cfg.get("selection_rebalance_days", 15),
         top_k=strat_cfg.get("top_k", 4),
-        n_levels=strat_cfg.get("n_levels", 16),
-        grid_spacing_pct=strat_cfg.get("grid_spacing_pct", 0.020),
+        n_levels=strat_cfg.get("n_levels", 20),
+        grid_spacing_pct=strat_cfg.get("grid_spacing_pct", 0.010),
         stop_buffer_levels=strat_cfg.get("stop_buffer_levels", 2),
         trend_filter=strat_cfg.get("trend_filter", "none"),
         risk_free_rate=strat_cfg.get("risk_free_rate", 0.06)

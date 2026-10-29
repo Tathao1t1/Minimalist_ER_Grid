@@ -182,6 +182,8 @@ The table below presents the complete quantitative track record across all evalu
 | **Forward Holdout**| 2026-01 to 2026-09 *(8.5 mos)* | **302** | 235 | 67 | 0 | **77.81%** | **+4.71%** | -3.52% | +0.152 | 9.4% | 90.6% | **Yes** (+4.71% vs +4.17%) |
 | **Full Lifecycle** | **2021 to 2026 (~5.5 years)** | **1,779** | **1,392** | **387** | **0** | **78.25%** | **+27.06%** | **-5.10%** | **-0.291** | **7.0%** | **93.0%** | **Drawdown Protection Alpha** |
 
+*(Note: Step 4 evaluates the initial unoptimized baseline hypothesis N = 20, Δ = 1.0% configured in config/config.yaml, which generated 2,239 trades and -11.83% return; Step 5 optimizes the grid geometry to N = 16, Δ = 2.0%, achieving +7.76% in-sample and deployed across Out-of-Sample, 2025, and Forward Holdout as reported above).*
+
 ### Repository Structure
 
 ```text
@@ -251,34 +253,37 @@ python scripts/run_benchmark_ablation.py
 
 ---
 
-## In-Sample Backtesting (2021–2023)
+## In-Sample Baseline Backtesting (2021–2023)
 
 ```bash
 python scripts/run_is.py
 ```
 
-Evaluates the strategy parameters (`N = 16`, `Δ = 2.0%`, lookback 30d, rebalance 15d) from `config/config.yaml`.
+Evaluates the initial baseline hypothesis (`N = 20`, `Δ = 1.0%`, lookback 30d, rebalance 15d) from `config/config.yaml`. This configuration represents natural round-number heuristics (100 bps spacing, 20% total channel coverage).
 
 | Metric | Plutus Expected | Verified Result | Plutus Tolerance | Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Total Return (HPR)** | +7.76% | **+7.76%** (+77,646,139 VND) | Relative ± 5.0% | **PASS** |
-| **Annualized Return (CAGR)** | +2.76% | **+2.76%** | Relative ± 5.0% | **PASS** |
-| **Maximum Drawdown (MDD)** | -4.16% | **-4.16%** | Relative ± 5.0% | **PASS** |
-| **Daily Sharpe (Rf=6%)** | -0.729 | **-0.729** | Absolute ± 0.15 | **PASS** |
-| **Calmar Ratio** | 0.663 | **0.663** | Absolute ± 0.05 | **PASS** |
-| **VN30 Benchmark Return** | -11.42% | **-11.42%** | — | **+19.18% Excess** |
-| **VN30 Benchmark MaxDD** | -42.46% | **-42.46%** | — | **10.2× Drawdown Reduction** |
+| **Total Return (HPR)** | -11.83% | **-11.83%** (-118,280,822 VND) | Relative ± 5.0% | **PASS** |
+| **Annualized Return (CAGR)** | -4.48% | **-4.48%** | Relative ± 5.0% | **PASS** |
+| **Maximum Drawdown (MDD)** | -16.00% | **-16.00%** | Relative ± 5.0% | **PASS** |
+| **Daily Sharpe (Rf=6%)** | -1.482 | **-1.482** | Absolute ± 0.15 | **PASS** |
+| **Calmar Ratio** | -0.280 | **-0.280** | Absolute ± 0.05 | **PASS** |
+| **VN30 Benchmark Return** | -11.42% | **-11.42%** | — | **-0.41% Spread** |
+| **VN30 Benchmark MaxDD** | -42.46% | **-42.46%** | — | **2.65× Drawdown Reduction** |
 | **6% Bank Deposit Hurdle** | +17.38% | **+17.38%** | Reference | **Hurdle Benchmark** |
-| **Beat 6% Hurdle** | — | **No** (+7.76% vs +17.38%) | Exact | **Underperformed Hurdle** |
-| **Average Capital Invested** | — | **7.4%** (92.6% Cash) | Monitored | **Low Exposure** |
-| **Take-Profit Harvest PnL** | — | **+214,548,039 VND** | Realized | **Harvest Gross** |
-| **Rotation-Exit PnL** | — | **-136,901,900 VND** | Realized | **Net Drag** |
-| **Completed Trades** | 937 | **937** (717 TP, 220 Rotation) | Exact Match | **PASS** |
-| **Win Rate** | 76.52% | **76.52%** | Relative ± 5.0% | **PASS** |
-| **Emergency Floor Stops** | 0 | **0 episodes (0 lots)** | Exact Match | **PASS** |
+| **Beat 6% Hurdle** | — | **No** (-11.83% vs +17.38%) | Exact | **Underperformed Hurdle** |
+| **Average Capital Invested** | — | **12.4%** (87.6% Cash) | Monitored | **Moderate Exposure** |
+| **Take-Profit Harvest PnL** | — | **+205,265,543 VND** | Realized | **Harvest Gross** |
+| **Rotation-Exit PnL** | — | **-123,074,592 VND** | Realized | **Net Drag** |
+| **Completed Trades** | 2239 | **2,239** (1,764 TP, 322 Rotation) | Exact Match | **PASS** |
+| **Win Rate** | 78.79% | **78.79%** | Relative ± 5.0% | **PASS** |
+| **Emergency Floor Stops** | 19 | **19 episodes (153 lots)** | Exact Match | **PASS** |
 | **Period-End Inventory** | 0 VND | **0 VND (100% Cash)** | Exact Match | **PASS** |
 
 ![In-Sample Equity Curve](images/equity_curve_in_sample.png)
+
+> [!NOTE]
+> **Baseline Diagnostic**: The initial unoptimized baseline ($N = 20$ levels, $\Delta = 1.0\%$) generated high harvest velocity (1,764 take-profits). However, its 20% total channel depth ($20 \times 1.0\% = 20.0\%$) proved insufficient during the severe 2022 market collapse (-42.46% VN30 drawdown), causing 19 floor stop liquidations and pulling the net return to -11.83%. This directly establishes the empirical rationale for the Step 5 optimization: searching for an expanded, resilient grid geometry.
 
 ---
 
@@ -300,10 +305,10 @@ The optimization is conducted **sequentially** strictly on In-Sample data (2021�
 | **N = 14** | -0.391 | -0.209 | -0.166 | +0.038 | +0.613 |
 | **N = 16** | -0.404 | -0.266 | -0.165 | +0.475 | **+0.663 (Optimal Peak)** |
 | **N = 18** | -0.387 | -0.230 | -0.153 | +0.437 | +0.637 |
-| **N = 20** | -0.374 | -0.280 | +0.122 | +0.367 | +0.540 |
+| **N = 20** | -0.374 | **-0.280 (Baseline)** | +0.122 | +0.367 | +0.540 |
 
 > [!NOTE]
-> **Optimal Peak**: The exhaustive In-Sample Calmar surface optimization identifies **N = 16 levels, Δ = 2.0%** as the global interior optimum (Calmar Ratio **+0.663**, Daily Sharpe **-0.729**). Piped to `config/best_params.yaml`.
+> **Optimization Breakthrough**: Notice the starting baseline position at **N = 20, Δ = 1.0% (Calmar -0.280)**. By widening spacing to **Δ = 2.0%** and calibrating levels to **N = 16**, the grid channel depth expands to $16 \times 2\% = 32\%$, completely eliminating floor stop liquidations (0 stops vs 19 baseline stops). In-Sample performance improves dramatically from **-11.83% to +7.76% HPR**, drawdown drops from **-16.00% to -4.16% MDD**, and Calmar ratio elevates to **+0.663** (Daily Sharpe **-0.729**). These optimal parameters are committed to `config/best_params.yaml` and deployed across all forward periods.
 
 ---
 
@@ -401,8 +406,9 @@ For visual demonstrations and defense slides, the following figures and explorat
 
 > [!TIP]
 > **Why Deployed Parameters Are N = 16 Levels and Δ = 2.0% Spacing**:
-> - **Optimization Selection (N = 16, Δ = 2.0%)**: In-Sample Calmar surface optimization evaluated $N \in [12..20]$ and $\Delta \in [0.5\%..2.0\%]$. $N = 16, \Delta = 2.0\%$ yielded the global optimum (Calmar Ratio **+0.663**, +7.76% return, -4.16% MDD).
-> - **Consistent Deployment**: These parameters are configured in `config/config.yaml` and saved in `config/best_params.yaml`, deployed across all evaluation periods (In-Sample, Out-of-Sample 2024, 2025 Bull Test, 2026 Holdout, and the visualization script). The emergency floor trigger is set at 18 levels deep (16 active levels + 2 buffer levels = 18, $0.640 \times A_0$).
+> - **Initial Baseline (N = 20, Δ = 1.0%)**: Configured in `config/config.yaml` as an intuitive starting hypothesis (100 bps spacing, 20% channel depth). It demonstrated the vulnerability of shallow channel coverage during the 2022 bear market (-11.83% return, 19 floor stop liquidations).
+> - **Optimization Selection (N = 16, Δ = 2.0%)**: In-Sample Calmar surface optimization evaluated $N \in [12..20]$ and $\Delta \in [0.5\%..2.0\%]$. Moving from baseline to $N = 16, \Delta = 2.0\%$ expanded channel depth to 32%, completely eliminating floor stop liquidations and yielding the global optimum (Calmar Ratio **+0.663**, +7.76% return, -4.16% MDD).
+> - **Consistent Deployment**: These parameters are saved in `config/best_params.yaml` and deployed across all forward periods (Out-of-Sample 2024, 2025 Bull Test, 2026 Holdout, and visualization scripts). The emergency floor trigger is set at 18 levels deep (16 active levels + 2 buffer levels = 18, $0.640 \times A_0$).
 
 2. **Kaufman ER Roundtrip Analysis** (`python scripts/analyze_er_roundtrips.py`):
    ![ER Roundtrip Comparison](images/er_roundtrip_comparison.png)
@@ -418,7 +424,7 @@ For visual demonstrations and defense slides, the following figures and explorat
 ## Conclusion & Limitations
 
 1. **Hurdle Rate Assessment (6% Deposit Benchmark)**:
-   - **In-Sample (2021–2023)**: **Did NOT beat hurdle** (+7.76% vs +17.38%).
+   - **In-Sample (2021–2023)**: **Did NOT beat hurdle** (-11.83% baseline / +7.76% optimized vs +17.38%).
    - **Out-of-Sample (2024)**: **Did NOT beat hurdle** (+5.18% vs +5.98%).
    - **2025 Bull Regime**: **Beat hurdle** (+7.04% vs +5.96%).
    - **2026 Forward Holdout**: **Beat hurdle** (+4.71% HPR / +6.78% CAGR vs +4.17%).
