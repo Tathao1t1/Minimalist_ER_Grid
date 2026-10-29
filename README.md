@@ -19,7 +19,10 @@ Our research solves this dual challenge through a disciplined quantitative archi
 
 ---
 
-## Step 1: Strategy Concept & Mathematical Hypothesis
+## Step 1: Forming Hypothesis
+
+- **Core Thesis**: *Low-ER stocks oscillate, so an adaptive grid can harvest recurring mean-reversion profits.*
+- **Subsystem Focus**: *ER volatility filter + objective spacing bounds derived from In-Sample market microstructure.*
 
 ### 1.1 Mathematical Formulation of Kaufman ER
 Kaufman ER quantifies the ratio of directional price displacement to total path length over a historical window of $k = 30$ trading days:
@@ -37,17 +40,41 @@ To ensure grid trading captures true intraday oscillations rather than multi-wee
 2. **Oscillation Ceiling**: $\Delta_{\max} = \lfloor 2/3 \times \text{IS median daily HL range} \rfloor = \lfloor 2.09\% \rfloor = 2.00\%$ (rounded to 10 bps increments).
 3. **T+2.5 Settlement Rule**: Under HOSE rules, shares purchased on day $T$ settle at $T+2$ 13:00, requiring at least two trading sessions per roundtrip harvest cycle.
 
-### 1.3 Deterministic Strategy Rules
+---
+
+## Step 2: Data Preparation
+
+```bash
+python scripts/run_data_prep.py
+```
+
+- **Universe**: Continuous 30-minute OHLCV bar feeds across the VN30 constituent basket (2021–2026).
+- **Corporate Action Adjustments**: Cumulative split and cash dividend adjustments applied via `data/corporate_actions/adjustment_factors.parquet`.
+- **Pre-Split Indicator Warm-Up**: 50 trading days prepended before each out-of-sample split so moving averages and Kaufman ER indicators are fully populated on Day 1.
+
+| Evaluation Split | Calendar Window | Total Bars | Macro Market Regime |
+| :--- | :--- | :---: | :--- |
+| **In-Sample** | 2021-01-01 to 2023-12-31 | 192,886 | 2021 Bull Boom → 2022 Secular Bear (-42.46% MDD) |
+| **Out-of-Sample** | 2024-01-01 to 2024-12-31 | 67,428 | Market Recovery (+18.83% VN30) |
+| **2025 Bull Test** | 2025-01-01 to 2025-12-31 | 66,244 | Strong Liquidity Bull (+51.18% VN30) |
+| **Forward Holdout** | 2026-01-01 to 2026-09-18 | 46,203 | Choppy Downward Drift (-3.18% VN30, -16.96% MDD) |
+
+---
+
+## Step 3: Forming Set of Rules (Entry, Exit, Size, Execution Logic)
+
+- **Subsystem Focus**: *Select, size, grid, rotate, stop, mark ($N = 16\text{ levels} \times \Delta = 2.0\%$)*.
+
 The strategy executes under 6 deterministic mathematical rules designed for the Cash-Only HOSE market microstructure:
 
-#### Rule 1 — Universe Selection & Lookahead Elimination
+### Rule 1 — Universe Selection & Entry Logic
 Every 15 trading days at market open (rebalance period $T_{\text{reb}} = 15$), screen all VN30 constituents for consolidation around their 50-period SMA trend anchor:
 ```text
 |Close(t-1) - SMA50(t-1)| / SMA50(t-1) <= 3.0%
 ```
 Constituents satisfying this proximity condition are ranked ascending by their 30-day Kaufman Efficiency Ratio ($\text{ER}_{30}$). The top $k = 4$ lowest-ER stocks enter the active portfolio whitelist. All indicator inputs evaluate strictly prior-day bar closes ($t - 1$) to eliminate lookahead bias.
 
-#### Rule 2 — Dynamic Capital Budgeting & Board Lot Truncation
+### Rule 2 — Dynamic Capital Budgeting & Sizing Logic
 Portfolio initial equity ($C_0 = 1,000,000,000\text{ VND}$) is partitioned equally across $k = 4$ active stocks ($250,000,000\text{ VND}$ per stock) and subdivided across $N = 16$ geometric levels:
 ```text
 C_level = C_0 / (k × N) = 1,000,000,000 / (4 × 16) = 15,625,000 VND per tranche
@@ -57,7 +84,7 @@ Order quantities are truncated to HOSE 100-share board lots via floor division:
 Shares(i) = floor(C_level / (P_buy(i) × 100)) × 100
 ```
 
-#### Rule 3 — Geometric Grid Geometry & Limit Execution
+### Rule 3 — Geometric Grid Geometry & Limit Execution
 Grid levels are anchored at the 50-period SMA ($A_0 = \text{SMA}_{50}$) and deployed geometrically downward with spacing $\Delta = 2.0\%$:
 ```text
 P_buy(i) = A_0 × (1 - i × 2.0%),       for i = 1, 2, ..., 16
@@ -72,13 +99,13 @@ Level 16 (i=16): Gross Margin = 0.020 / (1 - 16 × 0.020) = 0.020 / 0.680 = 2.94
 Net Margin:      +1.54% to +2.44% per cycle after deducting 50 bps roundtrip fees
 ```
 
-#### Rule 4 — Whitelist Rotation & T+2 Settlement Discipline
+### Rule 4 — Whitelist Rotation & Exit Discipline
 When a stock rotates off the whitelist at a 15-day rebalance boundary:
 1. All unfilled buy limit orders are cancelled immediately.
 2. Legally cleared shares ($T+2$ settled) are liquidated at market close on rotation day.
 3. Pending clearance shares are held until legal settlement and liquidated at the opening auction on their settlement morning ($T+2.5$).
 
-#### Rule 5 — Emergency Floor Stop Architecture
+### Rule 5 — Emergency Floor Stop Architecture
 To guard against severe structural breakdowns, an emergency floor stop is placed 2 buffer levels ($N_{\text{buffer}} = 2$) below the deepest active grid level ($N = 16$):
 ```text
 P_floor = A_0 × (1 - (N + N_buffer) × Δ)
@@ -87,50 +114,19 @@ P_floor = A_0 × (1 - (N + N_buffer) × Δ)
 ```
 The trading grid consists of 16 active buy levels ($N = 16$) at 2.0% spacing, covering a cumulative depth of $16 \times 2.0\% = 32.0\%$ below anchor. The emergency floor trigger is set at 18 intervals deep ($-36.0\%$ from anchor). If price breaches $P_{\text{floor}}$, all buying ceases and inventory is liquidated upon legal $T+2$ clearance.
 
-#### Rule 6 — Period-End Mark-to-Market Accounting
+### Rule 6 — Period-End Mark-to-Market Accounting
 Unsold inventory at backtest termination is marked to market at the final bar's closing price without artificial liquidation. Realized harvest PnL, rotation drag, open inventory value, and unrealized PnL are reported explicitly.
 
 ---
 
-## Step 2: Data Preparation & Hygiene
-
-```bash
-python scripts/run_data_prep.py
-```
-
-- **Frequency**: Continuous 30-minute OHLCV bar feeds across the VN30 constituent basket.
-- **Corporate Action Adjustments**: Cumulative split and cash dividend adjustments applied via `data/corporate_actions/adjustment_factors.parquet`.
-- **Pre-Split Indicator Warm-Up**: 50 trading days prepended before each out-of-sample split so moving averages and Kaufman ER indicators are fully populated on Day 1.
-
-| Evaluation Split | Calendar Window | Total Bars | Macro Market Regime |
-| :--- | :--- | :---: | :--- |
-| **In-Sample** | 2021-01-01 to 2023-12-31 | 192,886 | 2021 Bull Boom → 2022 Secular Bear (-42.46% MDD) |
-| **Out-of-Sample** | 2024-01-01 to 2024-12-31 | 67,428 | Market Recovery (+18.83% VN30) |
-| **2025 Bull Test** | 2025-01-01 to 2025-12-31 | 66,244 | Strong Liquidity Bull (+51.18% VN30) |
-| **Forward Holdout** | 2026-01-01 to 2026-09-18 | 46,203 | Choppy Downward Drift (-3.18% VN30, -16.96% MDD) |
-
----
-
-## Step 3: Fast-Check Baseline & Market Feasibility
-
-Before executing exhaustive multi-period backtests, the strategy hypothesis was tested for microstructure feasibility:
-1. **Initial Heuristic Baseline**: Tested an intuitive round-number heuristic: $N = 20$ levels, $\Delta = 1.0\%$ spacing (providing 20.0% total channel coverage).
-2. **Realistic Friction Model**: Applied exact institutional transaction costs:
-   - Brokerage Commission: 15 bps (0.15%)
-   - SSC Selling Tax: 10 bps (0.10%)
-   - Market Slippage: 5 bps (0.05%) on fill
-   - Total Roundtrip Cost: 50 bps (0.50%)
-3. **Execution Constraints**: Board lot rounding to 100 shares, zero short selling, and strict T+2.5 settlement delay.
-
----
-
-## Step 4: In-Sample Baseline Backtesting (2021–2023)
+## Step 4: In-Sample Backtest
 
 ```bash
 python scripts/run_is.py
 ```
 
-Evaluates the initial baseline hypothesis (`N = 20`, `Δ = 1.0%`, lookback 30d, rebalance 15d) configured in `config/config.yaml`.
+- **Subtitle**: *Backtest a simple baseline ($20\text{ levels} \times 1\%$) on 2021–2023*.
+- **Baseline Parameters**: `N = 20`, `Δ = 1.0%`, lookback 30d, rebalance 15d configured in `config/config.yaml`.
 
 | Metric | Plutus Expected | Verified Result | Plutus Tolerance | Status |
 | :--- | :---: | :---: | :---: | :---: |
@@ -157,11 +153,13 @@ Evaluates the initial baseline hypothesis (`N = 20`, `Δ = 1.0%`, lookback 30d, 
 
 ---
 
-## Step 5: Hyperparameter Optimization
+## Step 5: Optimization
 
 ```bash
 python scripts/run_optimization.py
 ```
+
+- **Subtitle**: *Tune timing, then grid shape, in-sample only ($N = 16, \Delta = 2.0\%$)*.
 
 The optimization is conducted **sequentially** strictly on In-Sample data (2021–2023):
 1. **Timing Sweep**: Evaluated 16 combinations of lookback in `[20..60]d` and rebalance in `[5..20]d`. **Lookback = 30d, Rebalance = 15d** emerged as the global peak.
@@ -181,9 +179,11 @@ The optimization is conducted **sequentially** strictly on In-Sample data (2021�
 
 ---
 
-## Step 6: Out-of-Sample Testing & Regime Stress Testing
+## Step 6: Out-of-Sample Backtest
 
-### Step 6a: Out-of-Sample Backtesting (2024 Recovery)
+- **Subtitle**: *Run frozen parameters ($N = 16, \Delta = 2.0\%$) across forward evaluation periods (2024 OOS, 2025 Bull Test, and 2026 Holdout)*.
+
+### 6.1 Out-of-Sample Backtest (2024 Recovery)
 
 ```bash
 python scripts/run_oos.py
@@ -213,7 +213,7 @@ Evaluates the deployed parameters (`N = 16`, `Δ = 2.0%`) on untouched 2024 data
 
 ---
 
-### Step 6b: 2025 Bull Market Stress Test
+### 6.2 2025 Bull Market Stress Test
 
 ```bash
 python scripts/run_2025.py
@@ -242,7 +242,7 @@ Tests strategy behavior during a parabolic upward trending regime (+51.18% VN30)
 
 ---
 
-## Step 7: Paper Trading & Forward Holdout (2026)
+### 6.3 Forward Holdout Backtest (2026)
 
 ```bash
 python scripts/run_holdout.py
@@ -273,7 +273,7 @@ Evaluated on completely untouched data from January 1 to September 18, 2026:
 
 ---
 
-## Multi-Period Performance & Capital Utilization Summary
+### 6.4 Multi-Period Performance & Capital Utilization Summary
 
 The table below presents the complete quantitative track record across all evaluation periods, honestly disclosing completed trades, harvest win rate, capital utilization, and benchmark hurdle performance:
 
@@ -385,7 +385,7 @@ Minimalist_ER_Grid/
 │   ├── run_2025.py                 # Step 6b: 2025 bull regime evaluation
 │   ├── run_benchmark_ablation.py   # Empirical benchmark ablation (20 seeds)
 │   ├── run_data_prep.py            # Step 2: Data preparation & schema integrity
-│   ├── run_holdout.py              # Step 7: Forward holdout evaluation (2026)
+│   ├── run_holdout.py              # Step 6c: Forward holdout evaluation (2026)
 │   ├── run_is.py                   # Step 4: In-Sample baseline backtesting
 │   ├── run_oos.py                  # Step 6a: Out-of-Sample backtesting (2024)
 │   ├── run_optimization.py         # Step 5: Exhaustive grid optimization
@@ -419,14 +419,12 @@ python scripts/run_is.py
 # 4. Step 5: Run In-Sample hyperparameter optimization
 python scripts/run_optimization.py
 
-# 5. Step 6: Run Out-of-Sample (2024) and 2025 bull regime evaluation
+# 5. Step 6: Run Out-of-Sample backtesting (2024 OOS, 2025 Bull Test, 2026 Holdout)
 python scripts/run_oos.py
 python scripts/run_2025.py
-
-# 6. Step 7: Run Forward Holdout evaluation (2026)
 python scripts/run_holdout.py
 
-# 7. Research Extensions: Run 20-seed ablation study & visualizations
+# 6. Research Extensions: Run 20-seed ablation study & visualizations
 python scripts/run_benchmark_ablation.py
 python scripts/visualize_price_grid_overlay.py
 python scripts/analyze_er_roundtrips.py
