@@ -98,7 +98,7 @@ python run_benchmark_ablation.py
 - **Frequency**: 30-minute OHLCV continuous bar feeds.
 - **Universe**: Liquid VN30 basket constituents dynamically tracked across time.
 - **Adjustment Factors**: All splits, cash dividends, and rights offerings are adjusted using **back-adjusted** factors (cumulative through 2026-10-27) stored in `data/corporate_actions/adjustment_factors.parquet`.
-- **Pre-Split Indicator Warm-Up (P-4)**: To eliminate idle startup delays and simulate continuous live operations, each out-of-sample split prepends 50 trading days of prior historical sessions marked with `is_warmup=True`. Indicators ($\text{ER}_{30\text{d}}$, $\text{SMA}_{50}$) are fully populated on Day 1, allowing active trading immediately at the opening bell.
+- **Pre-Split Indicator Warm-Up**: To eliminate idle startup delays and simulate continuous live operations, each out-of-sample split prepends 50 trading days of prior historical sessions marked with `is_warmup=True`. Indicators ($\text{ER}_{30\text{d}}$, $\text{SMA}_{50}$) are fully populated on Day 1, allowing active trading immediately at the opening bell.
 - **In-Sample Cold Start**: The In-Sample evaluation begins cold on `2021-01-01`. Because the 40-day ER lookback (baseline) requires initial historical data, active trading begins on **2021-04-13**, spanning **2.71 trading years** (not 2.85 or 3.0 full years). Note that the SMA filter uses 50 × 30-min bars (≈ 5.5 sessions), not daily bars.
 
 ```
@@ -129,7 +129,7 @@ All schemas and date boundaries validated successfully.
 
 ## 3. Transforming Hypothesis to a Set of Rules
 
-### Rule 1 — Universe Selection Sequence & Lookahead Elimination (`A-8`)
+### Rule 1 — Universe Selection Sequence & Lookahead Elimination
 Every 15 trading days at market open (09:30):
 1. Identify all active VN30 constituents.
 2. **First Filter**: Retain only equities whose current price is within $\pm 3\%$ of their 50-period Simple Moving Average:
@@ -145,7 +145,7 @@ $$\frac{|P_t - \text{SMA}_{50}(t)|}{\text{SMA}_{50}(t)} \le 0.03$$
 > [!NOTE]
 > **Fallback & Deployment Protocol**: If fewer than 4 stocks pass the SMA gate, remaining whitelist slots are filled with the lowest-ER stocks that failed the gate (`build_zero_overlap_whitelist`), ensuring fully funded portfolio diversification. Furthermore, once established at rebalance open, the geometric limit grid is deployed without re-checking the SMA filter on the deployment day.
 
-### Rule 2 — Dynamic Tranche Budgeting & Board Lot Truncation (`A-13`)
+### Rule 2 — Dynamic Tranche Budgeting & Board Lot Truncation
 - Total portfolio capital $C_0 = 1{,}000{,}000{,}000\text{ VND}$ is partitioned equally across the 4 selected stocks:
 
 $$C_{\text{stock}} = \frac{C_0}{4} = 250{,}000{,}000\text{ VND}$$
@@ -176,20 +176,20 @@ For $\Delta = 2.0\%$ and $N = 16$, this ranges from **$2.04\%$ ($k=1$) to $2.94\
 - **Microstructure Realism**: Orders scheduled at bar $t$ become active strictly on bar $t+1$.
 - **Favourable Opening Gap Execution with Slippage**: If bar $t+1$ opens below the limit order ($\text{Open}_{t+1} < P_{\text{buy}, k}$), the trader enjoys favorable price improvement: the fill occurs at $\text{Open}_{t+1} \times (1 + 0.0005)$, capturing price improvement below the limit order plus realistic opening slippage.
 
-### Rule 4 — Rotation Discipline & Orderly Liquidation (`A-7`)
+### Rule 4 — Rotation Discipline & Orderly Liquidation
 When a stock rotates off the 15-day active whitelist:
 1. **Immediate Buy Cancellation**: All unfilled buy limit orders are cancelled immediately. No new tranches may be acquired.
 2. **Orderly Liquidation Upon Legal Settlement**: Open inventory already legally settled ($T+2$) is liquidated at the current bar's close (`fill = bar_close`) upon rotation detection.
 3. **Pending Settlement Tracking**: Open tranches awaiting $T+2$ clearance are tagged as `pending_rotation_exit` and liquidated at the market opening price immediately upon legal clearance.
 
-### Rule 5 — Emergency Floor Stop with Trading-Session Calendar (`A-3`, `A-12`)
+### Rule 5 — Emergency Floor Stop with Trading-Session Calendar
 To protect against catastrophic structural failure:
 
 $$P_{\text{floor}} = A_0 \times (1 - (N + 2) \times \Delta) = A_0 \times (1 - (16 + 2) \times 0.020) = A_0 \times (1 - 0.360) = 0.640 \cdot A_0$$
 
 If price breaches $P_{\text{floor}}$, all grid buying halts immediately. Settled shares liquidate at market open, while unsettled shares liquidate on their legal settlement date determined via HOSE active trading sessions (`np.searchsorted` over actual business dates). Multiple tranches stopped out on the same date are consolidated into a single emergency liquidation episode (`stop_episodes`).
 
-### Rule 6 — Period-End Inventory Mark-to-Market Accounting (`A-4`)
+### Rule 6 — Period-End Inventory Mark-to-Market Accounting
 At the conclusion of each evaluation split, open positions are marked to market at the closing price of the final 30-minute bar. Unrealized profit/loss is reported explicitly alongside cash balances, avoiding artificial forced liquidations.
 
 ---
@@ -233,7 +233,7 @@ python run_is.py
 
 ## 5. Hyperparameter Optimization & Sensitivity Analysis
 
-### 1. In-Sample Lookback $\times$ Rebalance Sensitivity Sweep (`P-1`)
+### 1. In-Sample Lookback $\times$ Rebalance Sensitivity Sweep
 To identify the true selection timing parameters without lookahead or holdout snooping, a 16-point sensitivity sweep across lookback $\in [20, 30, 40, 60]\text{ days}$ and rebalance $\in [5, 10, 15, 20]\text{ days}$ was conducted strictly on In-Sample data:
 
 ```bash
@@ -265,7 +265,7 @@ Saved to [`results/lookback_rebalance_surface.csv`](results/lookback_rebalance_s
 
 ---
 
-### 2. Sequential In-Sample Grid Optimization (`P-1`, `P-2`, `P-6`, F-16)
+### 2. Sequential In-Sample Grid Optimization
 The parameter optimization is conducted **sequentially** strictly on In-Sample data (2021–2023):
 1. **Timing Sweep**: First, lookback and rebalance parameters were swept across 16 combinations at baseline grid settings ($N=18, \Delta=1.8\%$). As proven in §5.1, **Lookback = 30d, Rebalance = 15d** emerged as the global peak.
 2. **Objective Grid Search**: Second, fixing timing at ($30\text{d}, 15\text{d}$), `src/optimizer.py` automatically reads the objective spacing bounds from `config/grid_spacing_bounds.yaml` ($[0.5\%, 2.0\%]$ derived from IS daily volatility) and evaluates $N \in [12, 14, 16, 18, 20]$ across $\Delta \in [0.5\%, 1.0\%, 1.4\%, 1.8\%, 2.0\%]$:
@@ -296,7 +296,7 @@ The 25-point optimization surface is committed to [`results/optimization_grid_su
 | **$N = 18$** | $-1.739$ | $-1.242$ | $-1.402$ | $-0.868$ | $-0.930$ |
 | **$N = 20$** | $-1.835$ | $-1.482$ | $-0.937$ | $-1.070$ | $-1.149$ |
 
-#### Full In-Sample Calmar Ratio Surface from 0.5% to 4.0% (Informational Disclosure, F-1)
+#### Full In-Sample Calmar Ratio Surface from 0.5% to 4.0% (Informational Disclosure)
 For complete research transparency, the full exploratory surface from $0.5\%$ to $4.0\%$ is published below to disclose what the $2.0\%$ rule-based constraint gives up:
 
 | Levels ($N$) / Spacing ($\Delta$) | 0.5% | 1.0% | 1.4% | 1.8% | 2.0% | 2.5% | 3.0% | 3.5% | 4.0% |
@@ -355,7 +355,7 @@ python run_oos.py
 
 ---
 
-## 7. 2025 Bull Regime Evaluation (`P-3`)
+## 7. 2025 Bull Regime Evaluation
 
 - **Window**: `2025-01-01` to `2025-12-31` (1.0 year, 66,244 bars).
 - **Macroeconomic Regime**: Strong liquidity bull market. The VN30 index surged by **$+51.18\%$** with a $-16.22\%$ intra-year correction.

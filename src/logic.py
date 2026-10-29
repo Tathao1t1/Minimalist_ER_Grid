@@ -194,10 +194,10 @@ class MinimalistERGridBacktest:
                 bars_df[c] *= 1000.0
         bars_df = bars_df.sort_values(["bar_close", "tickersymbol"]).reset_index(drop=True)
         
-        # Precompute trading days array for institutional settlement calendar (A-12)
+        # Precompute trading days array for institutional settlement calendar
         trading_days = np.array(sorted(bars_df["bar_close"].dt.date.unique()))
         
-        # 1. Build Whitelist with Rule 1: SMA proximity filter first, then ER ranking (A-8)
+        # 1. Build Whitelist with Rule 1: SMA proximity filter first, then ER ranking
         whitelist_by_date = build_zero_overlap_whitelist(
             bars_df,
             lookback_days=self.selection_lookback,
@@ -358,10 +358,10 @@ class MinimalistERGridBacktest:
             for ticker, g in list(grids.items()):
                 if ticker not in bar_group.index:
                     continue
-                # Rotation discipline: Never place/execute buys on off-whitelist tickers (A-7)
+                # Rotation discipline: Never place/execute buys on off-whitelist tickers
                 if ticker not in cur_wl:
                     continue
-                # Block new buys if floor stop was triggered (A-10)
+                # Block new buys if floor stop was triggered
                 if g.get("stop_triggered", False):
                     continue
                 # Order placement lag: Newly deployed grid at close of ts only active from bar t+1
@@ -378,11 +378,11 @@ class MinimalistERGridBacktest:
                     if bar_l > buy_px:
                         continue
                         
-                    # Favorable Gap Fill at open (A-14)
+                    # Favorable Gap Fill at open
                     fill_base = bar_o if bar_o <= buy_px else buy_px
                     actual_fill = fill_base * (1.0 + self.slippage)
                     
-                    # Tranche sizing strictly adhering to floor formula (A-13)
+                    # Tranche sizing strictly adhering to floor formula
                     order_shares = max(100, int(np.floor(capital_per_level / actual_fill / 100.0)) * 100)
                     entry_cost = actual_fill * order_shares * self.broker_fee
                     total_cost = actual_fill * order_shares + entry_cost
@@ -446,7 +446,7 @@ class MinimalistERGridBacktest:
             longest_dd_days = int(round(max_days))
             
         rets = eq_series.pct_change().dropna()
-        bars_per_year = 252.0 * 9.0  # 9 30-minute bars per day on HOSE (A-5)
+        bars_per_year = 252.0 * 9.0  # 9 30-minute bars per day on HOSE
         rf_per_bar = self.risk_free_rate / bars_per_year
         excess_mean = float(rets.mean() - rf_per_bar)
         sharpe = float(excess_mean / rets.std() * np.sqrt(bars_per_year)) if rets.std() > 0 else 0.0
@@ -460,9 +460,9 @@ class MinimalistERGridBacktest:
         daily_excess = daily_rets.mean() - rf_daily
         daily_sharpe = float(daily_excess / daily_rets.std() * np.sqrt(252)) if (len(daily_rets) > 0 and daily_rets.std() > 0) else 0.0
         
-        calmar = (cagr / abs(max_dd)) if max_dd != 0 else 0.0  # Preserves sign for losses (A-15)
+        calmar = (cagr / abs(max_dd)) if max_dd != 0 else 0.0  # Preserves sign for losses
         
-        # Floor-stop trade lots vs distinct liquidation episodes (A-3)
+        # Floor-stop trade lots vs distinct liquidation episodes
         tp_trades = self.trades_df[self.trades_df["reason"] == "target"] if len(self.trades_df) > 0 else pd.DataFrame()
         rot_trades = self.trades_df[self.trades_df["reason"].str.contains("rotation")] if len(self.trades_df) > 0 else pd.DataFrame()
         stop_trades = self.trades_df[self.trades_df["reason"].str.contains("floor_stop")] if len(self.trades_df) > 0 else pd.DataFrame()
@@ -479,7 +479,7 @@ class MinimalistERGridBacktest:
         stop_pnl = float(stop_trades["pnl"].sum()) if len(stop_trades) > 0 else 0.0
         win_rate = (len(tp_trades) / len(self.trades_df) * 100.0) if len(self.trades_df) > 0 else 0.0
         
-        # Period-end open inventory mark-to-market breakdown (A-4)
+        # Period-end open inventory mark-to-market breakdown
         open_positions = {}
         open_shares_count = 0
         open_cost_basis = 0.0
@@ -498,7 +498,7 @@ class MinimalistERGridBacktest:
         unrealized_pnl = open_market_val - open_cost_basis
         unrealized_pnl_pct = (unrealized_pnl / open_cost_basis * 100.0) if open_cost_basis > 0 else 0.0
         
-        # Benchmark VN30 performance metrics & risk comparison (A-1)
+        # Benchmark VN30 performance metrics & risk comparison
         vn30_df = data_bundle.get("vn30d", pd.DataFrame())
         bmk_hpr = 0.0
         bmk_cagr = 0.0

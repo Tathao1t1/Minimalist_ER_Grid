@@ -67,7 +67,7 @@ def main():
     res = sim.backtest(bundle)
     
     print("-" * 75)
-    print("FINANCIAL PERFORMANCE & BENCHMARK COMPARISON (A-1, A-2)")
+    print("FINANCIAL PERFORMANCE & BENCHMARK COMPARISON")
     print("-" * 75)
     print(f"Holding Period Return (HPR): {res['hpr']:+.2f}% ({int(res['net_profit']):+,d} VND)")
     print(f"Annualized Return (CAGR):     {res['annual_return']:+.2f}% (Annualized rate over 256 calendar days)")
@@ -81,7 +81,7 @@ def main():
     print(f"Annualized Jensen's Alpha:    {res['alpha']:+.2f}%")
     print(f"Average Capital Invested:     {res['avg_capital_invested_pct']:.1f}% ({100-res['avg_capital_invested_pct']:.1f}% Cash)")
     print("-" * 75)
-    print("SPOT HARVEST & TRADE EXECUTION BREAKDOWN (A-3, A-6)")
+    print("SPOT HARVEST & TRADE EXECUTION BREAKDOWN")
     print("-" * 75)
     print(f"Take-Profit Harvests:         {int(res['spot_harvest_pnl']):+,d} VND ({res['tp_trades']} trades)")
     print(f"Whitelist Rotation Exits:     {int(res['rotation_pnl']):+,d} VND ({res['rot_trades']} trades)")
@@ -89,7 +89,7 @@ def main():
     print(f"Total Completed Trades:       {res['total_trades']} (Win Rate: {res['win_rate']:.1f}%)")
     print(f"Simulated Transaction Costs:  50 bps roundtrip (15 bps buy/sell fee, 10 bps tax, 5 bps slippage)")
     print("-" * 75)
-    print("PERIOD-END OPEN INVENTORY BREAKDOWN (A-4)")
+    print("PERIOD-END OPEN INVENTORY BREAKDOWN")
     print("-" * 75)
     if res['open_positions']:
         pos_str = ", ".join(f"{k}: {v:,} shs" for k, v in sorted(res['open_positions'].items()))

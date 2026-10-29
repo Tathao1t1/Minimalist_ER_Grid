@@ -4,7 +4,7 @@ import pandas as pd
 def prepare_data(config, split="in_sample", include_warmup=True, warmup_days=40):
     """
     Load spot bar dataset and benchmark data for the requested split.
-    Automatically prepends prior historical trading sessions as indicator warm-up (P-4)
+    Automatically prepends prior historical trading sessions as indicator warm-up
     so trading can begin cleanly on Day 1 of the evaluation period.
     """
     data_cfg = config.get("data", {})
@@ -39,7 +39,7 @@ def prepare_data(config, split="in_sample", include_warmup=True, warmup_days=40)
         bars_df["bar_close"] = pd.to_datetime(bars_df["datetime"])
     bars_df["is_warmup"] = False
 
-    # Pre-split Indicator Warm-up (P-4)
+    # Pre-split Indicator Warm-up
     if include_warmup and warmup_days > 0:
         prior_file_map = {
             "out_sample": "in_sample_file",

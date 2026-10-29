@@ -14,7 +14,7 @@ from src.data_fetcher import prepare_data
 from src.logic import MinimalistERGridBacktest
 
 def load_deployed_params():
-    """Pipes deployed hyperparameters from config/best_params.yaml (F-6)."""
+    """Pipes deployed hyperparameters from config/best_params.yaml."""
     best_params_path = os.path.join(curr_dir, "config/best_params.yaml")
     if os.path.exists(best_params_path):
         with open(best_params_path, "r") as f:
@@ -64,7 +64,7 @@ def main():
         config = yaml.safe_load(f)
     strat_cfg = config.get("strategy", {})
     
-    # Pipe deployed parameters from config/best_params.yaml (F-6)
+    # Pipe deployed parameters from config/best_params.yaml
     deployed_params = load_deployed_params()
     strat_cfg.update(deployed_params)
     print(f"Piping deployed parameters: lookback={strat_cfg['selection_lookback']}d, "
@@ -137,7 +137,7 @@ def main():
         })
         print(f"  [Low ER without SMA Filter]   HPR: {res_nosma['hpr']:+6.2f}% | Daily Sharpe: {res_nosma['daily_sharpe']:5.3f} | MaxDD: {res_nosma['max_drawdown']:5.2f}% | WinRate: {res_nosma['win_rate']:5.1f}%")
         
-        # 4. Random Selection across 20 distinct seeds (F-6)
+        # 4. Random Selection across 20 distinct seeds
         print(f"  Evaluating Random Selection across 20 seeds (1..20)...")
         r_hprs, r_sharpes, r_mdds, r_winrates, r_stops, r_harvests, r_stop_pnls, r_rot_pnls = [], [], [], [], [], [], [], []
         r_eqs = []

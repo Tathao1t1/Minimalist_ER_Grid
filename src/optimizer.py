@@ -7,7 +7,7 @@ from .data_fetcher import prepare_data
 
 def run_optimization(config):
     """
-    Exhaustive 25-Point Grid Search Hyperparameter Optimization (P-1, P-2, P-6).
+    Exhaustive 25-Point Grid Search Hyperparameter Optimization.
     Evaluates combinations of N in [12, 14, 16, 18, 20] and Spacing in [1.6%, 3.2%]
     using In-Sample optimal lookback=30d, rebalance=15d strictly on In-Sample (2021-2023)
     using institutional Calmar Ratio and Daily Sharpe.
@@ -21,7 +21,7 @@ def run_optimization(config):
     if metric_target in ("sharpe_ratio", "sharpe"):
         metric_target = "daily_sharpe"
         
-    # Read objective grid spacing bounds computed from IS data (F-1)
+    # Read objective grid spacing bounds computed from IS data
     bounds_path = os.path.join(strat_dir, "config/grid_spacing_bounds.yaml")
     if os.path.exists(bounds_path):
         with open(bounds_path, "r") as f:
@@ -32,7 +32,7 @@ def run_optimization(config):
         
     n_levels_list = [12, 14, 16, 18, 20]
     
-    # Read optimal timing parameters dynamically from sequential sweep output (F-16)
+    # Read optimal timing parameters dynamically from sequential sweep output
     sweep_csv = os.path.join(strat_dir, "results/lookback_rebalance_surface.csv")
     if os.path.exists(sweep_csv):
         sweep_df = pd.read_csv(sweep_csv)
@@ -119,7 +119,7 @@ def run_optimization(config):
         "grid_spacing_pct": float(round(best_row["grid_spacing_pct"], 4))
     }
     
-    # Save to config/best_params.yaml for automated downstream piping (P-2, R-3)
+    # Save to config/best_params.yaml for automated downstream piping
     best_params_yaml = os.path.join(strat_dir, "config/best_params.yaml")
     with open(best_params_yaml, "w") as f:
         yaml.safe_dump({

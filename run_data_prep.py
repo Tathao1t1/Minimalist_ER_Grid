@@ -26,7 +26,7 @@ from src.data_fetcher import prepare_data
 
 def compute_is_grid_spacing_bounds(bars_df):
     """
-    Computes objective grid spacing bounds strictly from In-Sample (2021-2023) daily volatility (F-1).
+    Computes objective grid spacing bounds strictly from In-Sample (2021-2023) daily volatility.
     - Lower Bound (Cost Floor): 1.0 * round-trip friction (50 bps = 0.50%)
     - Upper Bound (Oscillation Cap): 2/3 * IS median daily high-low range (3.14% -> 2.09% capped at 2.0%)
     - T+2 Settlement Rule: A lot cannot be sold before T+2 13:00, spanning at least 2 sessions.
@@ -87,7 +87,7 @@ def main():
     print(f"Holdout dataset verified:       {holdout_rows:,} bars ({holdout_bundle['start_date']} to {holdout_bundle['end_date']})")
     print("All schemas and date boundaries validated successfully.")
     
-    # Compute and persist objective In-Sample grid spacing bounds (F-1)
+    # Compute and persist objective In-Sample grid spacing bounds
     bounds_info = compute_is_grid_spacing_bounds(is_bundle["bars"])
     bounds_path = os.path.join(curr_dir, "config/grid_spacing_bounds.yaml")
     with open(bounds_path, "w") as f:
