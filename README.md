@@ -53,11 +53,12 @@ An ablation study across evaluation splits evaluates Low ER against High ER, un-
 
 | Evaluation Split | Selection Cohort | Total Return (HPR) | Daily Sharpe (Rf=6%) | Max Drawdown | Win Rate | Floor Stops | Spot Harvest PnL | Rotation PnL |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **In-Sample**<br>*(2021–2023)* | **Low ER (Proposed Strategy)** | **+7.76%** | **-0.729** | **-4.16%** | **76.5%** | **0** | **+214,548,039 VND** | **-136,901,900 VND** |
+| **In-Sample**<br>*(2021–2023)* | **Low ER (Initial Baseline: N=20, Δ=1.0%)** | **-11.83%** | **-1.482** | **-16.00%** | **78.8%** | **19 (153 lots)** | **+205,265,544 VND** | **-123,074,592 VND** |
+|  | **Low ER (Deployed Model: N=16, Δ=2.0%)** | **+7.76%** | **-0.729** | **-4.16%** | **76.5%** | **0** | **+214,548,039 VND** | **-136,901,900 VND** |
 |  | High ER (Counter-Hypothesis) | +0.57% | -1.750 | -6.09% | 76.8% | 16 | +98,845,917 VND | -42,619,842 VND |
 |  | Low ER without SMA Filter | +7.08% | -0.798 | -5.01% | 76.5% | 0 | +214,718,051 VND | -143,914,036 VND |
 |  | Random Selection (20 Seeds: +5.13%, [-2.39%, +9.43%]) | +5.13% | -0.879 | -6.73% | 75.8% | 9 | +195,776,056 VND | -120,033,313 VND |
-| | *Random Baseline Percentile Rank* | *Low ER: 75.0th percentile* | *Random 20-seed range: [-2.39%, +9.43%]* | — | — | — | — | — |
+| | *Random Baseline Percentile Rank* | *Low ER (Deployed): 75.0th percentile* | *Random 20-seed range: [-2.39%, +9.43%]* | — | — | — | — | — |
 | **Out-of-Sample**<br>*(2024)* | **Low ER (Proposed Strategy)** | **+5.18%** | **-0.355** | **-1.66%** | **79.7%** | **0** | **+65,718,464 VND** | **-13,817,998 VND** |
 |  | High ER (Counter-Hypothesis) | +4.81% | -0.645 | -0.86% | 79.6% | 0 | +57,022,948 VND | -9,226,653 VND |
 |  | Low ER without SMA Filter | +4.93% | -0.410 | -1.82% | 76.4% | 0 | +64,390,084 VND | -14,996,392 VND |
@@ -72,9 +73,10 @@ An ablation study across evaluation splits evaluates Low ER against High ER, un-
 ![Benchmark Ablation Comparison](images/benchmark_ablation_comparison.png)
 
 **Key Findings**:
-1. **Low ER Outperforms High ER**: Low ER beats High ER in all three splits (+7.76% vs +0.57% in IS; +5.18% vs +4.81% in OOS; +4.71% vs +0.35% in Holdout).
-2. **Low ER vs. Random Picks**: Low ER ranks at the **75th percentile** in In-Sample and Holdout, and at the **45th percentile** during the broad 2024 recovery.
-3. **Role of the SMA Gate**: Both variants experienced 0 emergency stops across all splits. The gate moderated bear drawdowns (-4.16% vs -5.01%) while accepting a modest drag during choppy range-bound drift (+4.71% vs +5.33%).
+1. **Optimization Turnaround & Channel Depth**: In the In-Sample secular bear market, the initial baseline ($N = 20, \Delta = 1.0\%$) suffered from a shallow 20% channel depth, triggering 19 floor stop liquidations (-11.83% return, -16.00% MDD). Optimizing to $N = 16, \Delta = 2.0\%$ expanded channel depth to 32%, completely eliminating floor stop liquidations (0 stops), cutting drawdown to -4.16%, and boosting return to **+7.76%**.
+2. **Low ER Outperforms High ER**: Under identical deployed parameters ($N = 16, \Delta = 2.0\%$), Low ER decisively beats High ER across all three splits (+7.76% vs +0.57% in IS; +5.18% vs +4.81% in OOS; +4.71% vs +0.35% in Holdout). Trending high-ER stocks suffered 16 floor stop episodes even under 2.0% spacing.
+3. **Low ER vs. Random Picks**: Low ER ranks at the **75th percentile** in In-Sample and Holdout, and at the **45th percentile** during the broad 2024 recovery.
+4. **Role of the SMA Gate**: Both variants experienced 0 emergency stops across all splits. The gate moderated bear drawdowns (-4.16% vs -5.01%) while accepting a modest drag during choppy range-bound drift (+4.71% vs +5.33%).
 
 ---
 
@@ -176,11 +178,12 @@ The table below presents the complete quantitative track record across all evalu
 
 | Evaluation Period | Calendar Window | Total Trades | Take-Profit (Win) | Whitelist Rotations | Floor Stops | Win Rate | Net HPR (%) | MDD (%) | Daily Sharpe | Avg Invested Capital | Avg Idle Cash | Beat 6% Deposit Hurdle? |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **In-Sample** | 2021-04 to 2023-12 *(33 mos)* | **937** | 717 | 220 | 0 | **76.52%** | **+7.76%** | -4.16% | -0.729 | 7.4% | 92.6% | **No** (+7.76% vs +17.38%) |
+| **In-Sample (Baseline)** | 2021-04 to 2023-12 *(33 mos)* | **2,239** | 1,764 | 322 | 19 | **78.79%** | **-11.83%** | -16.00% | -1.482 | 12.4% | 87.6% | **No** (-11.83% vs +17.38%) |
+| **In-Sample (Optimized)** | 2021-04 to 2023-12 *(33 mos)* | **937** | 717 | 220 | 0 | **76.52%** | **+7.76%** | -4.16% | -0.729 | 7.4% | 92.6% | **No** (+7.76% vs +17.38%) |
 | **Out-of-Sample** | 2024-01 to 2024-12 *(12 mos)* | **217** | 173 | 44 | 0 | **79.72%** | **+5.18%** | -1.66% | -0.355 | 5.0% | 95.0% | **No** (+5.18% vs +5.98%) |
 | **2025 Bull Test** | 2025-01 to 2025-12 *(12 mos)* | **323** | 267 | 56 | 0 | **82.66%** | **+7.04%** | -5.10% | +0.186 | 6.4% | 93.6% | **Yes** (+7.04% vs +5.96%) |
 | **Forward Holdout**| 2026-01 to 2026-09 *(8.5 mos)* | **302** | 235 | 67 | 0 | **77.81%** | **+4.71%** | -3.52% | +0.152 | 9.4% | 90.6% | **Yes** (+4.71% vs +4.17%) |
-| **Full Lifecycle** | **2021 to 2026 (~5.5 years)** | **1,779** | **1,392** | **387** | **0** | **78.25%** | **+27.06%** | **-5.10%** | **-0.291** | **7.0%** | **93.0%** | **Drawdown Protection Alpha** |
+| **Full Lifecycle (Deployed)** | **2021 to 2026 (~5.5 years)** | **1,779** | **1,392** | **387** | **0** | **78.25%** | **+27.06%** | **-5.10%** | **-0.291** | **7.0%** | **93.0%** | **Drawdown Protection Alpha** |
 
 *(Note: Step 4 evaluates the initial unoptimized baseline hypothesis N = 20, Δ = 1.0% configured in config/config.yaml, which generated 2,239 trades and -11.83% return; Step 5 optimizes the grid geometry to N = 16, Δ = 2.0%, achieving +7.76% in-sample and deployed across Out-of-Sample, 2025, and Forward Holdout as reported above).*
 

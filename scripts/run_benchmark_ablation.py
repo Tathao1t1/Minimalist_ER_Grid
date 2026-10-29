@@ -81,11 +81,34 @@ def main():
         print(f"\n---> Evaluating Split: {split.upper()} ...")
         bundle = prepare_data(config, split)
         
-        # 1. Low ER (Proposed Strategy)
-        res_low = run_experiment("Low ER (Proposed Strategy)", bundle, strat_cfg, selection_mode="er_low", use_sma_filter=True)
+        # 0. If in_sample, evaluate initial baseline hypothesis (N=20, Δ=1.0%)
+        if split == "in_sample":
+            with open(cfg_path, "r") as f:
+                base_cfg_raw = yaml.safe_load(f).get("strategy", {})
+            res_base = run_experiment("Low ER (Initial Baseline: N=20, Δ=1.0%)", bundle, base_cfg_raw, selection_mode="er_low", use_sma_filter=True)
+            all_results.append({
+                "split": split,
+                "cohort": "Low ER (Initial Baseline: N=20, Δ=1.0%)",
+                "hpr": res_base["hpr"],
+                "net_profit": res_base["net_profit"],
+                "sharpe": res_base["daily_sharpe"],
+                "max_dd": res_base["max_drawdown"],
+                "win_rate": res_base["win_rate"],
+                "tp_trades": res_base.get("tp_trades", 0),
+                "stop_trades": res_base.get("stop_trades", 0),
+                "harvest_pnl": res_base.get("spot_harvest_pnl", 0.0),
+                "stop_pnl": res_base.get("floor_stop_pnl", 0.0),
+                "rotation_pnl": res_base.get("rotation_pnl", 0.0),
+                "equity_series": res_base["equity_series"]
+            })
+            print(f"  [Low ER (Initial Baseline)]   HPR: {res_base['hpr']:+6.2f}% | Daily Sharpe: {res_base['daily_sharpe']:5.3f} | MaxDD: {res_base['max_drawdown']:5.2f}% | WinRate: {res_base['win_rate']:5.1f}%")
+
+        # 1. Low ER (Deployed Model)
+        cohort_name = "Low ER (Deployed Model: N=16, Δ=2.0%)" if split == "in_sample" else "Low ER (Proposed Strategy)"
+        res_low = run_experiment(cohort_name, bundle, strat_cfg, selection_mode="er_low", use_sma_filter=True)
         all_results.append({
             "split": split,
-            "cohort": "Low ER (Proposed Strategy)",
+            "cohort": cohort_name,
             "hpr": res_low["hpr"],
             "net_profit": res_low["net_profit"],
             "sharpe": res_low["daily_sharpe"],
@@ -98,7 +121,7 @@ def main():
             "rotation_pnl": res_low.get("rotation_pnl", 0.0),
             "equity_series": res_low["equity_series"]
         })
-        print(f"  [Low ER (Proposed)]           HPR: {res_low['hpr']:+6.2f}% | Daily Sharpe: {res_low['daily_sharpe']:5.3f} | MaxDD: {res_low['max_drawdown']:5.2f}% | WinRate: {res_low['win_rate']:5.1f}%")
+        print(f"  [Low ER (Deployed Model)]     HPR: {res_low['hpr']:+6.2f}% | Daily Sharpe: {res_low['daily_sharpe']:5.3f} | MaxDD: {res_low['max_drawdown']:5.2f}% | WinRate: {res_low['win_rate']:5.1f}%")
         
         # 2. High ER (Counter-Hypothesis)
         res_high = run_experiment("High ER (Counter-Hypothesis)", bundle, strat_cfg, selection_mode="er_high", use_sma_filter=True)
@@ -201,11 +224,15 @@ def main():
     # Save comparison chart
     fig, axes = plt.subplots(1, 3, figsize=(21, 6.5), sharey=False)
     colors = {
-        "Low ER (Proposed Strategy)": "#059669",      # Emerald Green
-        "High ER (Counter-Hypothesis)": "#DC2626",    # Crimson Red
-        "Low ER without SMA Filter": "#D97706"       # Amber
+        "Low ER (Initial Baseline: N=20, Δ=1.0%)": "#4B5563",  # Slate Gray
+        "Low ER (Deployed Model: N=16, Δ=2.0%)": "#059669",    # Emerald Green
+        "Low ER (Proposed Strategy)": "#059669",                # Emerald Green
+        "High ER (Counter-Hypothesis)": "#DC2626",              # Crimson Red
+        "Low ER without SMA Filter": "#D97706"                 # Amber
     }
     styles = {
+        "Low ER (Initial Baseline: N=20, Δ=1.0%)": ":",
+        "Low ER (Deployed Model: N=16, Δ=2.0%)": "-",
         "Low ER (Proposed Strategy)": "-",
         "High ER (Counter-Hypothesis)": "--",
         "Low ER without SMA Filter": "-."
@@ -259,7 +286,7 @@ def main():
         s_rows = summary_df[summary_df["split"] == split]
         for row_idx, (_, r) in enumerate(s_rows.iterrows()):
             sp = split_name if row_idx == 0 else ""
-            bold = "**" if "Proposed" in r["cohort"] else ""
+            bold = "**" if ("Proposed" in r["cohort"] or "Deployed" in r["cohort"] or "Baseline" in r["cohort"]) else ""
             c_label = r["cohort"]
             print(f"| {sp} | {bold}{c_label}{bold} | {bold}{r['hpr']:+.2f}%{bold} | {bold}{r['sharpe']:.3f}{bold} | {bold}{r['max_dd']:.2f}%{bold} | {bold}{r['win_rate']:.1f}%{bold} | {bold}{r['stop_trades']}{bold} | {bold}{r['harvest_pnl']:+,.0f} VND{bold} | {bold}{r['rotation_pnl']:+,.0f} VND{bold} |")
         # Print random stats row
