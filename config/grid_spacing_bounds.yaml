@@ -1,0 +1,17 @@
+is_median_daily_hl_range: 0.03135
+lower_bound_pct: 0.005
+upper_bound_pct: 0.02
+candidate_spacings:
+- 0.005
+- 0.01
+- 0.014
+- 0.018
+- 0.02
+rule_description:
+  lower_bound: 1.0 * round-trip friction (50 bps = 0.50%)
+  upper_bound: floor(2/3 * IS median daily high-low range to nearest 10 bps) = floor(2.09%)
+    = 2.0%
+  rounding_protocol: Floored to nearest 10 bps (0.10%) to preserve standard quote
+    tick regularity and conservative range containment
+  t_plus_2_rule: A lot cannot be sold before T+2 13:00, requiring at least 2 sessions
+    per cycle

@@ -1,0 +1,12 @@
+strategy:
+  selection_lookback: 30
+  selection_rebalance_days: 15
+  n_levels: 16
+  grid_spacing_pct: 0.02
+optimization_metadata:
+  target_metric: calmar_ratio
+  best_value: 0.6631
+  in_sample_hpr: 7.76
+  in_sample_mdd: -4.16
+  in_sample_daily_sharpe: -0.729
+  in_sample_calmar: 0.663
