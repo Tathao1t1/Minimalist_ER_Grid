@@ -1,7 +1,4 @@
-![Static Badge](https://img.shields.io/badge/PLUTUS-100%25_Verified-darkgreen)
-![Static Badge](https://img.shields.io/badge/Python-3.12-blue)
-![Static Badge](https://img.shields.io/badge/Exchange-HOSE%20%7C%20VN30-orange)
-![Static Badge](https://img.shields.io/badge/Friction-50%20bps-red)
+
 
 # Minimalist Kaufman ER Spot Grid Strategy
 
@@ -147,11 +144,6 @@ P_floor = A_0 × (1 - (N + N_buffer) × Δ)
         = A_0 × (1 - 0.360) = 0.640 × A_0
 ```
 
-> [!NOTE]
-> **Active Grid Levels (N = 16) vs. Emergency Floor (N + 2 = 18)**:
-> - The operational trading grid consists of **16 active buy levels** (`N = 16`) at **2.0% spacing** (`Δ = 2.0%`), covering a cumulative depth of `16 × 2.0% = 32.0%` below the anchor.
-> - The number `18` in the floor stop formula represents the 16 active levels plus a 2-level buffer interval (`16 + 2 = 18` intervals, or `-36.0%` from anchor).
-> - If price breaches `P_floor`, all buying ceases and inventory is liquidated upon T+2 clearance.
 
 ### Rule 6 — Period-End Mark-to-Market Accounting
 Unsold inventory at backtest termination is marked to market at the final bar's closing price without artificial liquidation. Realized harvest PnL, rotation drag, open inventory value, and unrealized PnL are reported explicitly.
@@ -285,8 +277,7 @@ Evaluates the initial baseline hypothesis (`N = 20`, `Δ = 1.0%`, lookback 30d, 
 
 ![In-Sample Equity Curve](images/equity_curve_in_sample.png)
 
-> [!NOTE]
-> **Baseline Diagnostic**: The initial unoptimized baseline ($N = 20$ levels, $\Delta = 1.0\%$) generated high harvest velocity (1,764 take-profits). However, its 20% total channel depth ($20 \times 1.0\% = 20.0\%$) proved insufficient during the severe 2022 market collapse (-42.46% VN30 drawdown), causing 19 floor stop liquidations and pulling the net return to -11.83%. This directly establishes the empirical rationale for the Step 5 optimization: searching for an expanded, resilient grid geometry.
+
 
 ---
 
@@ -310,8 +301,6 @@ The optimization is conducted **sequentially** strictly on In-Sample data (2021�
 | **N = 18** | -0.387 | -0.230 | -0.153 | +0.437 | +0.637 |
 | **N = 20** | -0.374 | **-0.280 (Baseline)** | +0.122 | +0.367 | +0.540 |
 
-> [!NOTE]
-> **Optimization Breakthrough**: Notice the starting baseline position at **N = 20, Δ = 1.0% (Calmar -0.280)**. By widening spacing to **Δ = 2.0%** and calibrating levels to **N = 16**, the grid channel depth expands to $16 \times 2\% = 32\%$, completely eliminating floor stop liquidations (0 stops vs 19 baseline stops). In-Sample performance improves dramatically from **-11.83% to +7.76% HPR**, drawdown drops from **-16.00% to -4.16% MDD**, and Calmar ratio elevates to **+0.663** (Daily Sharpe **-0.729**). These optimal parameters are committed to `config/best_params.yaml` and deployed across all forward periods.
 
 ---
 
@@ -407,11 +396,6 @@ For visual demonstrations and defense slides, the following figures and explorat
    ![Grid Price Overlay](images/grid_price_overlay_demonstration.png)
    *Figure: Deployed strategy (N = 16 geometric levels, Δ = 2.0% spacing) executing on CTG during Out-of-Sample (June–August 2024). Demonstrates 50-SMA central anchor (A_0), limit buy fills (green triangles), take-profit executions (blue circles), rotation exits (amber diamonds), floor stop line (0.640 × A_0), and active share inventory oscillations (lower panel) capturing +4,140,872 VND in realized harvest profit.*
 
-> [!TIP]
-> **Why Deployed Parameters Are N = 16 Levels and Δ = 2.0% Spacing**:
-> - **Initial Baseline (N = 20, Δ = 1.0%)**: Configured in `config/config.yaml` as an intuitive starting hypothesis (100 bps spacing, 20% channel depth). It demonstrated the vulnerability of shallow channel coverage during the 2022 bear market (-11.83% return, 19 floor stop liquidations).
-> - **Optimization Selection (N = 16, Δ = 2.0%)**: In-Sample Calmar surface optimization evaluated $N \in [12..20]$ and $\Delta \in [0.5\%..2.0\%]$. Moving from baseline to $N = 16, \Delta = 2.0\%$ expanded channel depth to 32%, completely eliminating floor stop liquidations and yielding the global optimum (Calmar Ratio **+0.663**, +7.76% return, -4.16% MDD).
-> - **Consistent Deployment**: These parameters are saved in `config/best_params.yaml` and deployed across all forward periods (Out-of-Sample 2024, 2025 Bull Test, 2026 Holdout, and visualization scripts). The emergency floor trigger is set at 18 levels deep (16 active levels + 2 buffer levels = 18, $0.640 \times A_0$).
 
 2. **Kaufman ER Roundtrip Analysis** (`python scripts/analyze_er_roundtrips.py`):
    ![ER Roundtrip Comparison](images/er_roundtrip_comparison.png)
